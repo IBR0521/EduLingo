@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+// Lazy initialization - only create Resend client when API key is available
+function getResendClient() {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) {
+    return null
+  }
+  return new Resend(apiKey)
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,6 +28,18 @@ export async function POST(request: NextRequest) {
           note: "Email functionality requires Resend API key configuration",
         },
         { status: 200 }, // Return 200 so message sending doesn't fail
+      )
+    }
+
+    const resend = getResendClient()
+    if (!resend) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Email service not configured",
+          note: "Email functionality requires Resend API key configuration",
+        },
+        { status: 200 },
       )
     }
 
