@@ -1,27 +1,25 @@
-"use client"
-
-import { ReactNode } from "react"
+import { LucideIcon } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 
 interface EmptyStateProps {
-  icon?: ReactNode
+  icon?: LucideIcon
   title: string
   description?: string
-  action?: ReactNode
+  action?: React.ReactNode
 }
 
-export function EmptyState({ icon, title, description, action }: EmptyStateProps) {
+export function EmptyState({ icon: Icon, title, description, action }: EmptyStateProps) {
   return (
     <Card className="border-dashed">
-      <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-        {icon && (
-          <div className="mb-6 opacity-40 transition-transform duration-300 hover:scale-110">
-            {icon}
+      <CardContent className="flex flex-col items-center justify-center py-12 px-4">
+        {Icon && (
+          <div className="mb-4 rounded-full bg-muted p-4">
+            <Icon className="h-8 w-8 text-muted-foreground" />
           </div>
         )}
-        <h3 className="text-xl font-semibold mb-2">{title}</h3>
+        <h3 className="text-lg font-semibold mb-2">{title}</h3>
         {description && (
-          <p className="text-sm text-muted-foreground mb-6 max-w-sm leading-relaxed">
+          <p className="text-sm text-muted-foreground text-center max-w-sm mb-4">
             {description}
           </p>
         )}
@@ -30,6 +28,3 @@ export function EmptyState({ icon, title, description, action }: EmptyStateProps
     </Card>
   )
 }
-
-
-

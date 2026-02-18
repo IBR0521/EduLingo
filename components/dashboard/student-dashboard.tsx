@@ -19,6 +19,11 @@ import { AnalyticsChart } from "@/components/dashboard/analytics-chart"
 import { BadgesDisplay } from "@/components/dashboard/gamification/badges-display"
 import { getUserProgressClient } from "@/lib/gamification-client"
 import { LearningPathViewer } from "@/components/dashboard/learning-path/learning-path-viewer"
+import { handleDatabaseError } from "@/lib/error-handler"
+import { useToastNotification } from "@/hooks/use-toast-notification"
+import { LoadingSpinner } from "@/components/ui/loading-spinner"
+import { Skeleton, SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-loader"
+import { EmptyState } from "@/components/ui/empty-state"
 
 interface StudentDashboardProps {
   user: User
@@ -53,6 +58,9 @@ export function StudentDashboard({ user }: StudentDashboardProps) {
   const [gradeTrendData, setGradeTrendData] = useState<Array<{ date: string; grade: number }>>([])
   const [attendanceChartData, setAttendanceChartData] = useState<Array<{ month: string; present: number; absent: number }>>([])
   const [isMounted, setIsMounted] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string>("")
+  const toast = useToastNotification()
 
   useEffect(() => {
     setIsMounted(true)
@@ -61,6 +69,8 @@ export function StudentDashboard({ user }: StudentDashboardProps) {
   }, [user.id])
 
   const loadStudentData = async () => {
+    setLoading(true)
+    setError("")
     try {
       const supabase = createClient()
 
@@ -85,7 +95,10 @@ export function StudentDashboard({ user }: StudentDashboardProps) {
       ])
 
       if (groupResponse.error) {
+        const errorInfo = handleDatabaseError(groupResponse.error, "Failed to load groups")
         console.error("Error loading groups:", groupResponse.error)
+        setError(errorInfo.message)
+        toast.showError(errorInfo.message)
         // Don't return early - try to continue with what we have
       }
 
@@ -311,7 +324,12 @@ export function StudentDashboard({ user }: StudentDashboardProps) {
         }
       }
     } catch (error) {
+      const errorInfo = handleDatabaseError(error, "Failed to load student data")
       console.error("Error loading student data:", error)
+      setError(errorInfo.message)
+      toast.showError(errorInfo.message)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -326,13 +344,40 @@ export function StudentDashboard({ user }: StudentDashboardProps) {
     setIsFilesDialogOpen(true)
   }
 
+  if (loading) {
+    return (
+      <DashboardLayout user={user}>
+        <div className="space-y-6">
+          <div>
+            <Skeleton variant="text" className="h-8 w-64 mb-2" />
+            <Skeleton variant="text" className="h-4 w-96" />
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {[...Array(4)].map((_, i) => (
+              <SkeletonCard key={i} />
+            ))}
+          </div>
+          <SkeletonTable />
+        </div>
+      </DashboardLayout>
+    )
+  }
+
   return (
     <DashboardLayout user={user}>
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Student Dashboard</h1>
-          <p className="text-muted-foreground">View your progress, assignments, and upcoming classes</p>
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight">Student Dashboard</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">View your progress, assignments, and upcoming classes</p>
         </div>
+
+        {error && (
+          <Card className="border-destructive bg-destructive/10">
+            <CardContent className="pt-6">
+              <p className="text-sm text-destructive">{error}</p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Gamification Progress */}
         <ProgressBadge 
@@ -342,7 +387,7 @@ export function StudentDashboard({ user }: StudentDashboardProps) {
         />
 
         {/* Stats Overview */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Average Grade</CardTitle>
@@ -397,10 +442,11 @@ export function StudentDashboard({ user }: StudentDashboardProps) {
             </CardHeader>
             <CardContent>
               {upcomingClasses.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Calendar className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p>No upcoming classes</p>
-                </div>
+                <EmptyState
+                  icon={Calendar}
+                  title="No upcoming classes"
+                  description="You don't have any scheduled classes at the moment"
+                />
               ) : (
                 <div className="space-y-4">
                   {upcomingClasses.map((schedule) => (
@@ -428,10 +474,11 @@ export function StudentDashboard({ user }: StudentDashboardProps) {
             </CardHeader>
             <CardContent>
               {assignments.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <ClipboardList className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p>No assignments</p>
-                </div>
+                <EmptyState
+                  icon={ClipboardList}
+                  title="No assignments"
+                  description="You don't have any assignments at the moment"
+                />
               ) : (
                 <div className="space-y-4">
                   {assignments.slice(0, 5).map((assignment) => {

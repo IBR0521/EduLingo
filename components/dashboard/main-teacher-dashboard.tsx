@@ -1,11 +1,17 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import type { User } from "@/lib/types"
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Plus, Users, BookOpen, UserCog, MessageSquare, CalendarDays } from "lucide-react"
+import { Plus, Users, BookOpen, UserCog, MessageSquare, CalendarDays, Menu, BarChart3 } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { GroupsManagement } from "@/components/dashboard/groups-management"
 import { TeachersManagement } from "@/components/dashboard/teachers-management"
 import { StudentsManagement } from "@/components/dashboard/students-management"
@@ -33,11 +39,38 @@ export function MainTeacherDashboard({ user }: MainTeacherDashboardProps) {
     "overview",
   )
   const [loading, setLoading] = useState(true)
+  const [showMobileMenu, setShowMobileMenu] = useState(false)
+  const [tabsOverflow, setTabsOverflow] = useState(false)
+  const tabsRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     loadStats()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    const checkTabsOverflow = () => {
+      if (tabsRef.current) {
+        // Check if tabs container has overflow
+        const container = tabsRef.current
+        const hasOverflow = container.scrollWidth > container.clientWidth
+        setTabsOverflow(hasOverflow)
+        
+        // Show mobile menu if tabs overflow OR on mobile/tablet screens
+        const isMobile = window.innerWidth < 1024
+        setShowMobileMenu(isMobile || hasOverflow)
+      }
+    }
+
+    // Check after a short delay to ensure DOM is ready
+    const timeoutId = setTimeout(checkTabsOverflow, 100)
+    window.addEventListener("resize", checkTabsOverflow)
+    
+    return () => {
+      clearTimeout(timeoutId)
+      window.removeEventListener("resize", checkTabsOverflow)
+    }
+  }, [activeTab]) // Re-check when tab changes
 
   const loadStats = async () => {
     setLoading(true)
@@ -98,65 +131,78 @@ export function MainTeacherDashboard({ user }: MainTeacherDashboardProps) {
     }
   }
 
+  const tabOptions = [
+    { id: "overview" as const, label: "Overview", icon: BookOpen },
+    { id: "groups" as const, label: "Groups", icon: Users },
+    { id: "teachers" as const, label: "Teachers", icon: UserCog },
+    { id: "students" as const, label: "Students", icon: Users },
+    { id: "schedule" as const, label: "Schedule", icon: CalendarDays },
+    { id: "analytics" as const, label: "Analytics", icon: BarChart3 },
+  ]
+
   return (
     <DashboardLayout user={user}>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Main Teacher Dashboard</h1>
-          <p className="text-muted-foreground">Manage all groups, teachers, and students</p>
+      <div className="space-y-4 sm:space-y-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight">Main Teacher Dashboard</h1>
+            <p className="text-sm sm:text-base text-muted-foreground mt-1">Manage all groups, teachers, and students</p>
+          </div>
+          {showMobileMenu && (
+            <div className="flex-shrink-0">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon" className="h-10 w-10">
+                    <Menu className="h-5 w-5" />
+                    <span className="sr-only">Open navigation menu</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  {tabOptions.map((tab) => {
+                    const Icon = tab.icon
+                    return (
+                      <DropdownMenuItem
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        className={activeTab === tab.id ? "bg-accent" : ""}
+                      >
+                        <Icon className="mr-2 h-4 w-4" />
+                        {tab.label}
+                      </DropdownMenuItem>
+                    )
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="flex gap-2 border-b">
-          <Button
-            variant={activeTab === "overview" ? "default" : "ghost"}
-            onClick={() => setActiveTab("overview")}
-            className="rounded-b-none"
-          >
-            Overview
-          </Button>
-          <Button
-            variant={activeTab === "groups" ? "default" : "ghost"}
-            onClick={() => setActiveTab("groups")}
-            className="rounded-b-none"
-          >
-            Groups
-          </Button>
-          <Button
-            variant={activeTab === "teachers" ? "default" : "ghost"}
-            onClick={() => setActiveTab("teachers")}
-            className="rounded-b-none"
-          >
-            Teachers
-          </Button>
-          <Button
-            variant={activeTab === "students" ? "default" : "ghost"}
-            onClick={() => setActiveTab("students")}
-            className="rounded-b-none"
-          >
-            Students
-          </Button>
-          <Button
-            variant={activeTab === "schedule" ? "default" : "ghost"}
-            onClick={() => setActiveTab("schedule")}
-            className="rounded-b-none"
-          >
-            <CalendarDays className="mr-2 h-4 w-4" />
-            Schedule
-          </Button>
-          <Button
-            variant={activeTab === "analytics" ? "default" : "ghost"}
-            onClick={() => setActiveTab("analytics")}
-            className="rounded-b-none"
-          >
-            Analytics
-          </Button>
-        </div>
+        {/* Navigation Tabs - Hidden on mobile when menu is shown */}
+        {!showMobileMenu && (
+          <div className="w-full border-b overflow-x-auto scrollbar-hide" ref={tabsRef}>
+            <div className="flex gap-2 min-w-max pb-1">
+              {tabOptions.map((tab) => {
+                const Icon = tab.icon
+                return (
+                  <Button
+                    key={tab.id}
+                    variant={activeTab === tab.id ? "default" : "ghost"}
+                    onClick={() => setActiveTab(tab.id)}
+                    className="rounded-b-none whitespace-nowrap text-xs sm:text-sm"
+                  >
+                    <Icon className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                    {tab.label}
+                  </Button>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Overview Tab */}
         {activeTab === "overview" && (
-          <div className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="space-y-4 sm:space-y-6">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
               <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative">
@@ -166,7 +212,7 @@ export function MainTeacherDashboard({ user }: MainTeacherDashboardProps) {
                   </div>
                 </CardHeader>
                 <CardContent className="relative">
-                  <div className="text-3xl font-bold">{stats.totalGroups}</div>
+                  <div className="text-2xl sm:text-3xl font-bold">{stats.totalGroups}</div>
                   <p className="text-xs text-muted-foreground mt-1">Active classes</p>
                 </CardContent>
               </Card>
@@ -180,7 +226,7 @@ export function MainTeacherDashboard({ user }: MainTeacherDashboardProps) {
                   </div>
                 </CardHeader>
                 <CardContent className="relative">
-                  <div className="text-3xl font-bold">{stats.totalTeachers}</div>
+                  <div className="text-2xl sm:text-3xl font-bold">{stats.totalTeachers}</div>
                   <p className="text-xs text-muted-foreground mt-1">Active teachers</p>
                 </CardContent>
               </Card>
@@ -194,7 +240,7 @@ export function MainTeacherDashboard({ user }: MainTeacherDashboardProps) {
                   </div>
                 </CardHeader>
                 <CardContent className="relative">
-                  <div className="text-3xl font-bold">{stats.totalStudents}</div>
+                  <div className="text-2xl sm:text-3xl font-bold">{stats.totalStudents}</div>
                   <p className="text-xs text-muted-foreground mt-1">Enrolled students</p>
                 </CardContent>
               </Card>
@@ -208,13 +254,13 @@ export function MainTeacherDashboard({ user }: MainTeacherDashboardProps) {
                   </div>
                 </CardHeader>
                 <CardContent className="relative">
-                  <div className="text-3xl font-bold">{stats.totalParents}</div>
+                  <div className="text-2xl sm:text-3xl font-bold">{stats.totalParents}</div>
                   <p className="text-xs text-muted-foreground mt-1">Connected parents</p>
                 </CardContent>
               </Card>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
               <Card>
                 <CardHeader>
                   <CardTitle>Quick Actions</CardTitle>

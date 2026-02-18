@@ -31,11 +31,19 @@ export async function middleware(request: NextRequest) {
 
     // Get session to ensure cookies are synced
     // This will return null if no session exists, which is fine
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-    
-    // Only log actual errors, not missing sessions (which is normal for unauthenticated requests)
-    if (sessionError && sessionError.message !== "Auth session missing!") {
-      console.error("Middleware session error:", sessionError)
+    // Wrap in try-catch to prevent errors from bubbling up
+    try {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      
+      // Only log actual errors, not missing sessions (which is normal for unauthenticated requests)
+      if (sessionError && sessionError.message !== "Auth session missing!" && sessionError.name !== "AuthSessionMissingError") {
+        console.error("Middleware session error:", sessionError)
+      }
+    } catch (sessionErr: any) {
+      // Silently ignore "Auth session missing" errors - they're expected for unauthenticated requests
+      if (sessionErr?.message !== "Auth session missing!" && sessionErr?.name !== "AuthSessionMissingError") {
+        console.error("Middleware session check error:", sessionErr)
+      }
     }
   } catch (error: any) {
     // Continue even if there's an error

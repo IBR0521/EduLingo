@@ -21,7 +21,7 @@ export function AdvancedAnalytics({ groupId, teacherId }: AdvancedAnalyticsProps
   const [loading, setLoading] = useState(true)
   const [analytics, setAnalytics] = useState({
     studentPerformance: [] as Array<{ name: string; average: number; assignments: number }>,
-    gradeDistribution: [] as Array<{ name: string; value: number }>,
+    gradeDistribution: [] as Array<{ name: string; value: number; color: string }>,
     attendanceTrend: [] as Array<{ date: string; present: number; absent: number }>,
     assignmentCompletion: [] as Array<{ assignment: string; completed: number; total: number; percentage: number }>,
     skillMastery: [] as Array<{ skill: string; average: number }>,
@@ -53,6 +53,7 @@ export function AdvancedAnalytics({ groupId, teacherId }: AdvancedAnalyticsProps
 
       if (!groupStudents || groupStudents.length === 0) {
         setLoading(false)
+        toast.info("No students in this group yet")
         return
       }
 
@@ -73,12 +74,21 @@ export function AdvancedAnalytics({ groupId, teacherId }: AdvancedAnalyticsProps
       // Check for errors in parallel queries
       if (gradesData.error) {
         console.error("Error loading grades:", gradesData.error)
+        toast.error("Failed to load grades data", {
+          description: gradesData.error.message || "Please try again",
+        })
       }
       if (attendanceData.error) {
         console.error("Error loading attendance:", attendanceData.error)
+        toast.error("Failed to load attendance data", {
+          description: attendanceData.error.message || "Please try again",
+        })
       }
       if (assignmentsData.error) {
         console.error("Error loading assignments:", assignmentsData.error)
+        toast.error("Failed to load assignments data", {
+          description: assignmentsData.error.message || "Please try again",
+        })
       }
       if (studentsData.error) {
         console.error("Error loading students:", studentsData.error)
@@ -103,13 +113,13 @@ export function AdvancedAnalytics({ groupId, teacherId }: AdvancedAnalyticsProps
         }
       }) || []
 
-      // Process grade distribution
+      // Process grade distribution - maintain consistent order and colors
       const gradeRanges = [
-        { name: "90-100", min: 90, max: 100 },
-        { name: "80-89", min: 80, max: 89 },
-        { name: "70-79", min: 70, max: 79 },
-        { name: "60-69", min: 60, max: 69 },
-        { name: "Below 60", min: 0, max: 59 },
+        { name: "90-100", min: 90, max: 100, color: "#0088FE" }, // Blue
+        { name: "80-89", min: 80, max: 89, color: "#00C49F" }, // Green
+        { name: "70-79", min: 70, max: 79, color: "#FFBB28" }, // Yellow/Orange
+        { name: "60-69", min: 60, max: 69, color: "#FF8042" }, // Orange/Red
+        { name: "Below 60", min: 0, max: 59, color: "#8884d8" }, // Purple
       ]
 
       const gradeDistribution = gradeRanges.map((range) => {
@@ -117,7 +127,7 @@ export function AdvancedAnalytics({ groupId, teacherId }: AdvancedAnalyticsProps
           gradesData.data?.filter(
             (g) => Number(g.score) >= range.min && Number(g.score) <= range.max
           ).length || 0
-        return { name: range.name, value: count }
+        return { name: range.name, value: count, color: range.color }
       })
 
       // Process attendance trend (last 30 days)
@@ -163,6 +173,9 @@ export function AdvancedAnalytics({ groupId, teacherId }: AdvancedAnalyticsProps
       })
     } catch (error) {
       console.error("Error loading analytics:", error)
+      toast.error("An unexpected error occurred", {
+        description: error instanceof Error ? error.message : "Please try again",
+      })
     } finally {
       setLoading(false)
     }
@@ -189,30 +202,44 @@ export function AdvancedAnalytics({ groupId, teacherId }: AdvancedAnalyticsProps
               <CardDescription>Average grades and assignment completion by student</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={450}>
-                <BarChart 
-                  data={analytics.studentPerformance}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 120 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="name" 
-                    angle={-45} 
-                    textAnchor="end" 
-                    height={120}
-                    interval={0}
-                    tick={{ fontSize: 12 }}
-                  />
-                  <YAxis 
-                    domain={[0, 100]}
-                    label={{ value: 'Score', angle: -90, position: 'insideLeft' }}
-                  />
-                  <Tooltip />
-                  <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                  <Bar dataKey="average" fill="#0088FE" name="Average Grade" />
-                  <Bar dataKey="assignments" fill="#00C49F" name="Assignments Completed" />
-                </BarChart>
-              </ResponsiveContainer>
+              {analytics.studentPerformance.length > 0 ? (
+                <ResponsiveContainer width="100%" height={450}>
+                  <BarChart 
+                    data={analytics.studentPerformance}
+                    margin={{ top: 20, right: 30, left: 20, bottom: 150 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="name" 
+                      angle={-45} 
+                      textAnchor="end" 
+                      height={150}
+                      interval={0}
+                      tick={{ fontSize: 11 }}
+                      width={80}
+                    />
+                    <YAxis 
+                      domain={[0, 100]}
+                      label={{ value: 'Score', angle: -90, position: 'insideLeft' }}
+                    />
+                    <Tooltip 
+                      formatter={(value: number, name: string) => {
+                        if (name === 'average') return [`${value.toFixed(1)}%`, 'Average Grade']
+                        return [value, 'Assignments Completed']
+                      }}
+                    />
+                    <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                    <Bar dataKey="average" fill="#0088FE" name="Average Grade" />
+                    <Bar dataKey="assignments" fill="#00C49F" name="Assignments Completed" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No student performance data available</p>
+                  <p className="text-sm mt-2">Grades will appear here once students complete assignments</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -224,25 +251,55 @@ export function AdvancedAnalytics({ groupId, teacherId }: AdvancedAnalyticsProps
               <CardDescription>Distribution of grades across all assignments</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={400}>
-                <PieChart>
-                  <Pie
-                    data={analytics.gradeDistribution}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={120}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {analytics.gradeDistribution.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+              {analytics.gradeDistribution.some(g => g.value > 0) ? (
+                <div className="space-y-4">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={analytics.gradeDistribution.filter(g => g.value > 0)}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, percent }) => {
+                          if (percent < 0.05) return '' // Hide labels for very small slices
+                          return `${name}: ${(percent * 100).toFixed(0)}%`
+                        }}
+                        outerRadius={100}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {analytics.gradeDistribution.filter(g => g.value > 0).map((entry) => (
+                          <Cell key={`cell-${entry.name}`} fill={entry.color || COLORS[0]} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        formatter={(value: number) => `${value} assignment${value !== 1 ? 's' : ''}`}
+                        labelFormatter={(name) => `Grade Range: ${name}`}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mt-4">
+                    {analytics.gradeDistribution.map((entry) => (
+                      <div key={entry.name} className="flex items-center gap-2">
+                        <div 
+                          className="w-4 h-4 rounded" 
+                          style={{ backgroundColor: entry.color || COLORS[0] }}
+                        />
+                        <div className="text-sm">
+                          <div className="font-medium">{entry.name}</div>
+                          <div className="text-muted-foreground">{entry.value} assignment{entry.value !== 1 ? 's' : ''}</div>
+                        </div>
+                      </div>
                     ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Award className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No grade distribution data available</p>
+                  <p className="text-sm mt-2">Grades will appear here once assignments are graded</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -284,21 +341,32 @@ export function AdvancedAnalytics({ groupId, teacherId }: AdvancedAnalyticsProps
                 <ResponsiveContainer width="100%" height={450}>
                   <BarChart 
                     data={analytics.assignmentCompletion}
-                    margin={{ top: 20, right: 30, left: 20, bottom: 120 }}
+                    margin={{ top: 20, right: 30, left: 20, bottom: 150 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis 
                       dataKey="assignment" 
                       angle={-45} 
                       textAnchor="end" 
-                      height={120}
+                      height={150}
                       interval={0}
-                      tick={{ fontSize: 12 }}
+                      tick={{ fontSize: 11 }}
+                      width={100}
                     />
-                    <YAxis domain={[0, 100]} />
-                    <Tooltip />
+                    <YAxis 
+                      domain={[0, 100]}
+                      label={{ value: 'Completion %', angle: -90, position: 'insideLeft' }}
+                    />
+                    <Tooltip 
+                      formatter={(value: number) => `${value}%`}
+                      labelFormatter={(label) => `Assignment: ${label}`}
+                    />
                     <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                    <Bar dataKey="percentage" fill="#8884d8" name="Completion %" />
+                    <Bar dataKey="percentage" fill="#8884d8" name="Completion %">
+                      {analytics.assignmentCompletion.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               ) : (

@@ -404,7 +404,7 @@ export function AnnouncementsManager({
 
       {announcements.length === 0 ? (
         <EmptyState
-          icon={<Megaphone className="h-12 w-12" />}
+          icon={Megaphone}
           title="No announcements yet"
           description={
             isStudentView

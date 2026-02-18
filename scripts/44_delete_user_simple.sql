@@ -39,3 +39,6 @@ END $$;
 -- Step 2: Delete from auth.users (run this separately if Step 1 worked)
 -- DELETE FROM auth.users WHERE email = 'bekzodburxonjonov455@gmail.com';
 
+
+
+

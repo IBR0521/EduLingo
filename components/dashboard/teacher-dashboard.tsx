@@ -39,21 +39,21 @@ export function TeacherDashboard({ user }: TeacherDashboardProps) {
 
   return (
     <DashboardLayout user={user}>
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Teacher Dashboard</h1>
-          <p className="text-muted-foreground">Manage your assigned groups and students</p>
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight">Teacher Dashboard</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">Manage your assigned groups and students</p>
         </div>
 
         {/* Stats Overview */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">My Groups</CardTitle>
               <BookOpen className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalGroups}</div>
+              <div className="text-xl sm:text-2xl font-bold">{stats.totalGroups}</div>
               <p className="text-xs text-muted-foreground">Assigned classes</p>
             </CardContent>
           </Card>
@@ -64,7 +64,7 @@ export function TeacherDashboard({ user }: TeacherDashboardProps) {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalStudents}</div>
+              <div className="text-xl sm:text-2xl font-bold">{stats.totalStudents}</div>
               <p className="text-xs text-muted-foreground">Across all groups</p>
             </CardContent>
           </Card>
@@ -75,7 +75,7 @@ export function TeacherDashboard({ user }: TeacherDashboardProps) {
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.upcomingClasses}</div>
+              <div className="text-xl sm:text-2xl font-bold">{stats.upcomingClasses}</div>
               <p className="text-xs text-muted-foreground">Scheduled sessions</p>
             </CardContent>
           </Card>
@@ -86,7 +86,7 @@ export function TeacherDashboard({ user }: TeacherDashboardProps) {
               <ClipboardList className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.pendingAssignments}</div>
+              <div className="text-xl sm:text-2xl font-bold">{stats.pendingAssignments}</div>
               <p className="text-xs text-muted-foreground">Due soon</p>
             </CardContent>
           </Card>

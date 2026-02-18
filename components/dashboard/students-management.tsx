@@ -32,6 +32,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { handleDatabaseError } from "@/lib/error-handler"
+import { Skeleton, SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-loader"
+import { EmptyState } from "@/components/ui/empty-state"
+import { LoadingState } from "@/components/ui/loading-state"
 
 interface StudentsManagementProps {
   onStatsChange?: () => void
@@ -58,6 +62,8 @@ export function StudentsManagement({ onStatsChange, isMainTeacher = false }: Stu
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [editingStudent, setEditingStudent] = useState<User | null>(null)
   const [editingStudentGroups, setEditingStudentGroups] = useState<Array<{ id: string; name: string; payment_amount: number | null }>>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string>("")
 
   // Add student form
   const [addFormData, setAddFormData] = useState({
@@ -83,21 +89,25 @@ export function StudentsManagement({ onStatsChange, isMainTeacher = false }: Stu
   }, [])
 
   const loadStudents = async () => {
-    const supabase = createClient()
-    
-    // Load registered students
-    const { data: studentsData, error: studentsError } = await supabase
-      .from("users")
-      .select("*")
-      .eq("role", "student")
-      .order("full_name")
+    setLoading(true)
+    setError("")
+    try {
+      const supabase = createClient()
+      
+      // Load registered students
+      const { data: studentsData, error: studentsError } = await supabase
+        .from("users")
+        .select("*")
+        .eq("role", "student")
+        .order("full_name")
 
-    if (studentsError) {
-      console.error("Error loading students:", studentsError)
-      toast.error("Failed to load students", {
-        description: studentsError.message || "Please try again",
-      })
-    }
+      if (studentsError) {
+        const errorInfo = handleDatabaseError(studentsError, "Failed to load students")
+        setError(errorInfo.message)
+        toast.error(errorInfo.message)
+        setLoading(false)
+        return
+      }
 
     // Load pending students (added by main teacher but not yet registered)
     const { data: pendingStudents, error: pendingError } = await supabase
@@ -192,6 +202,13 @@ export function StudentsManagement({ onStatsChange, isMainTeacher = false }: Stu
       }
       
       setStudentPayments(paymentsMap)
+    }
+    } catch (error) {
+      const errorInfo = handleDatabaseError(error, "Failed to load students")
+      setError(errorInfo.message)
+      toast.error(errorInfo.message)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -582,17 +599,29 @@ export function StudentsManagement({ onStatsChange, isMainTeacher = false }: Stu
     }
   }
 
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div>
+          <Skeleton variant="text" className="h-8 w-64 mb-2" />
+          <Skeleton variant="text" className="h-4 w-96" />
+        </div>
+        <SkeletonTable />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold">Students Management</h2>
-          <p className="text-muted-foreground">View students and their parent access codes</p>
+          <h2 className="text-xl sm:text-2xl font-bold">Students Management</h2>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">View students and their parent access codes</p>
         </div>
         {isMainTeacher && (
           <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="w-full sm:w-auto">
                 <Plus className="mr-2 h-4 w-4" />
                 Add Student
               </Button>
@@ -642,41 +671,51 @@ export function StudentsManagement({ onStatsChange, isMainTeacher = false }: Stu
         )}
       </div>
 
+      {error && (
+        <Card className="border-destructive bg-destructive/10">
+          <CardContent className="pt-6">
+            <p className="text-sm text-destructive">{error}</p>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="flex items-center gap-4">
         <Input
           placeholder="Search students by name or email..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="max-w-sm"
+          className="w-full sm:max-w-sm"
         />
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>All Students</CardTitle>
-          <CardDescription>Student information and parent linking codes</CardDescription>
+          <CardTitle className="text-lg sm:text-xl">All Students</CardTitle>
+          <CardDescription className="text-sm">Student information and parent linking codes</CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Student Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Payment Status</TableHead>
-                <TableHead>Parent Access Code</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredStudents.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">
-                    {searchTerm ? "No students found" : "No students registered yet"}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredStudents.map((student) => {
+          {filteredStudents.length === 0 && !loading ? (
+            <EmptyState
+              icon={Users}
+              title={searchTerm ? "No students found" : "No students registered yet"}
+              description={searchTerm ? "Try adjusting your search query" : "Add your first student to get started"}
+            />
+          ) : (
+            <div className="overflow-x-auto -mx-4 sm:mx-0">
+              <div className="inline-block min-w-full align-middle px-4 sm:px-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="min-w-[150px]">Student Name</TableHead>
+                      <TableHead className="min-w-[200px] hidden sm:table-cell">Email</TableHead>
+                      <TableHead className="min-w-[120px] hidden md:table-cell">Phone</TableHead>
+                      <TableHead className="min-w-[150px]">Payment</TableHead>
+                      <TableHead className="min-w-[140px] hidden lg:table-cell">Access Code</TableHead>
+                      <TableHead className="text-right min-w-[120px]">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredStudents.map((student) => {
                   const accessCode = studentAccessCodes[student.id]
                   const isPending = student.full_name === "Pending Registration"
                   const payments = studentPayments[student.id] || []
@@ -687,7 +726,10 @@ export function StudentsManagement({ onStatsChange, isMainTeacher = false }: Stu
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
                           <Users className="h-4 w-4 text-muted-foreground" />
-                          {student.full_name}
+                          <div>
+                            <div>{student.full_name}</div>
+                            <div className="text-xs text-muted-foreground sm:hidden">{student.email}</div>
+                          </div>
                           {isPending && (
                             <Badge variant="outline" className="text-xs">
                               Pending
@@ -695,8 +737,8 @@ export function StudentsManagement({ onStatsChange, isMainTeacher = false }: Stu
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{student.email}</TableCell>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell className="text-muted-foreground hidden sm:table-cell">{student.email}</TableCell>
+                      <TableCell className="text-muted-foreground hidden md:table-cell">
                         {student.phone_number || "-"}
                       </TableCell>
                       <TableCell>
@@ -807,7 +849,7 @@ export function StudentsManagement({ onStatsChange, isMainTeacher = false }: Stu
                             </>
                           )}
                           {accessCode && (
-                            <Button variant="ghost" size="sm" onClick={() => copyAccessCode(accessCode)}>
+                            <Button variant="ghost" size="sm" onClick={() => copyAccessCode(accessCode)} className="hidden lg:inline-flex">
                               {copiedCode === accessCode ? (
                                 <>
                                   <Check className="mr-2 h-4 w-4" />
@@ -825,10 +867,12 @@ export function StudentsManagement({ onStatsChange, isMainTeacher = false }: Stu
                       </TableCell>
                     </TableRow>
                   )
-                })
-              )}
-            </TableBody>
-          </Table>
+                })}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

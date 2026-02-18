@@ -546,7 +546,7 @@ export function RecurringScheduleManager({ groupId, currentUserId }: RecurringSc
         <CardContent>
           {singleSchedules.length === 0 ? (
             <EmptyState
-              icon={<Calendar className="h-8 w-8" />}
+              icon={Calendar}
               title="No schedules"
               description="Create your first schedule to get started"
             />

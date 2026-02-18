@@ -147,7 +147,7 @@ export function MainSchedule({ currentUserId }: MainScheduleProps) {
         </CardHeader>
         <CardContent>
           <EmptyState
-            icon={<Calendar className="h-10 w-10" />}
+            icon={Calendar}
             title="No schedules yet"
             description="Create weekly schedules inside a group to see them here."
           />
@@ -203,5 +203,8 @@ export function MainSchedule({ currentUserId }: MainScheduleProps) {
     </Card>
   )
 }
+
+
+
 
 

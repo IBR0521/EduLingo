@@ -61,3 +61,6 @@ export function AnalyticsChart({ gradeData, attendanceData, type }: AnalyticsCha
 
 
 
+
+
+

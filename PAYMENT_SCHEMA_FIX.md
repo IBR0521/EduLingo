@@ -54,3 +54,6 @@ If you still see errors after running the script:
 3. Check that all 5 payment columns are present
 4. Review the browser console for detailed error logs
 
+
+
+

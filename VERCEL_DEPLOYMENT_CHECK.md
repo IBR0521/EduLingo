@@ -56,3 +56,6 @@ VAPID_SUBJECT=mailto:your-email@example.com
 - ⚠️ Environment variables need to be configured
 - ⚠️ Supabase URL configuration needs update
 
+
+
+

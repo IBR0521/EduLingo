@@ -107,3 +107,6 @@ COMMENT ON COLUMN users.age IS 'Age of the user (student or teacher)';
 COMMENT ON COLUMN group_students.course_start_date IS 'Date when student started the course (used for payment reminders)';
 
 
+
+
+

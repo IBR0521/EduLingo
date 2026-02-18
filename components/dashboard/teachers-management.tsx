@@ -21,6 +21,9 @@ import {
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
+import { handleDatabaseError } from "@/lib/error-handler"
+import { Skeleton, SkeletonCard, SkeletonTable } from "@/components/ui/skeleton-loader"
+import { EmptyState } from "@/components/ui/empty-state"
 
 interface TeachersManagementProps {
   onStatsChange?: () => void
@@ -34,6 +37,8 @@ export function TeachersManagement({ onStatsChange, isMainTeacher = true }: Teac
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [editingTeacher, setEditingTeacher] = useState<User | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string>("")
   const { toast } = useToast()
 
   const [addFormData, setAddFormData] = useState({
@@ -56,19 +61,48 @@ export function TeachersManagement({ onStatsChange, isMainTeacher = true }: Teac
   }, [])
 
   const loadTeachers = async () => {
-    const supabase = createClient()
-    const { data: teachersData } = await supabase.from("users").select("*").eq("role", "teacher").order("full_name")
+    setLoading(true)
+    setError("")
+    try {
+      const supabase = createClient()
+      const { data: teachersData, error: teachersError } = await supabase.from("users").select("*").eq("role", "teacher").order("full_name")
 
-    if (teachersData) {
-      setTeachers(teachersData)
-
-      // Load groups for each teacher
-      const groupsMap: Record<string, Group[]> = {}
-      for (const teacher of teachersData) {
-        const { data: groups } = await supabase.from("groups").select("*").eq("teacher_id", teacher.id)
-        groupsMap[teacher.id] = groups || []
+      if (teachersError) {
+        const errorInfo = handleDatabaseError(teachersError, "Failed to load teachers")
+        setError(errorInfo.message)
+        toast({
+          title: "Error",
+          description: errorInfo.message,
+          variant: "destructive",
+        })
+        setLoading(false)
+        return
       }
-      setTeacherGroups(groupsMap)
+
+      if (teachersData) {
+        setTeachers(teachersData)
+
+        // Load groups for each teacher
+        const groupsMap: Record<string, Group[]> = {}
+        for (const teacher of teachersData) {
+          const { data: groups, error: groupsError } = await supabase.from("groups").select("*").eq("teacher_id", teacher.id)
+          if (groupsError) {
+            console.error(`Error loading groups for teacher ${teacher.id}:`, groupsError)
+          }
+          groupsMap[teacher.id] = groups || []
+        }
+        setTeacherGroups(groupsMap)
+      }
+    } catch (error) {
+      const errorInfo = handleDatabaseError(error, "Failed to load teachers")
+      setError(errorInfo.message)
+      toast({
+        title: "Error",
+        description: errorInfo.message,
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -292,17 +326,29 @@ export function TeachersManagement({ onStatsChange, isMainTeacher = true }: Teac
       teacher.email.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div>
+          <Skeleton variant="text" className="h-8 w-64 mb-2" />
+          <Skeleton variant="text" className="h-4 w-96" />
+        </div>
+        <SkeletonTable />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold">Teachers Management</h2>
-          <p className="text-muted-foreground">View and manage teachers, their details, and salaries</p>
+          <h2 className="text-xl sm:text-2xl font-bold">Teachers Management</h2>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">View and manage teachers, their details, and salaries</p>
         </div>
         {isMainTeacher && (
           <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="w-full sm:w-auto">
                 <Plus className="mr-2 h-4 w-4" />
                 Add Teacher
               </Button>
@@ -348,42 +394,52 @@ export function TeachersManagement({ onStatsChange, isMainTeacher = true }: Teac
         )}
       </div>
 
+      {error && (
+        <Card className="border-destructive bg-destructive/10">
+          <CardContent className="pt-6">
+            <p className="text-sm text-destructive">{error}</p>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="flex items-center gap-4">
         <Input
           placeholder="Search teachers by name or email..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="max-w-sm"
+          className="w-full sm:max-w-sm"
         />
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>All Teachers</CardTitle>
-          <CardDescription>Teacher information, group assignments, and salary status</CardDescription>
+          <CardTitle className="text-lg sm:text-xl">All Teachers</CardTitle>
+          <CardDescription className="text-sm">Teacher information, group assignments, and salary status</CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Teacher Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>IELTS / ETK</TableHead>
-                <TableHead>Salary Status</TableHead>
-                <TableHead>Assigned Groups</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredTeachers.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">
-                    {searchTerm ? "No teachers found" : "No teachers registered yet"}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredTeachers.map((teacher) => {
+          {filteredTeachers.length === 0 && !loading ? (
+            <EmptyState
+              icon={UserCog}
+              title={searchTerm ? "No teachers found" : "No teachers registered yet"}
+              description={searchTerm ? "Try adjusting your search query" : "Add your first teacher to get started"}
+            />
+          ) : (
+            <div className="overflow-x-auto -mx-4 sm:mx-0">
+              <div className="inline-block min-w-full align-middle px-4 sm:px-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="min-w-[150px]">Teacher Name</TableHead>
+                      <TableHead className="min-w-[200px] hidden sm:table-cell">Email</TableHead>
+                      <TableHead className="min-w-[120px] hidden md:table-cell">Phone</TableHead>
+                      <TableHead className="min-w-[100px]">IELTS/ETK</TableHead>
+                      <TableHead className="min-w-[150px]">Salary</TableHead>
+                      <TableHead className="min-w-[150px] hidden lg:table-cell">Groups</TableHead>
+                      <TableHead className="text-right min-w-[120px]">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredTeachers.map((teacher) => {
                   const groups = teacherGroups[teacher.id] || []
                   const salaryDue = isSalaryDue(teacher)
                   return (
@@ -391,11 +447,14 @@ export function TeachersManagement({ onStatsChange, isMainTeacher = true }: Teac
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
                           <UserCog className="h-4 w-4 text-muted-foreground" />
-                          {teacher.full_name}
+                          <div>
+                            <div>{teacher.full_name}</div>
+                            <div className="text-xs text-muted-foreground sm:hidden">{teacher.email}</div>
+                          </div>
                         </div>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{teacher.email}</TableCell>
-                      <TableCell className="text-muted-foreground">{teacher.phone_number || "-"}</TableCell>
+                      <TableCell className="text-muted-foreground hidden sm:table-cell">{teacher.email}</TableCell>
+                      <TableCell className="text-muted-foreground hidden md:table-cell">{teacher.phone_number || "-"}</TableCell>
                       <TableCell>
                         <div className="space-y-1">
                           {teacher.ielts_score && (
@@ -441,7 +500,7 @@ export function TeachersManagement({ onStatsChange, isMainTeacher = true }: Teac
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden lg:table-cell">
                         {groups.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
                             {groups.map((group) => (
@@ -454,8 +513,8 @@ export function TeachersManagement({ onStatsChange, isMainTeacher = true }: Teac
                           <span className="text-sm text-muted-foreground">No groups assigned</span>
                         )}
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2 flex-wrap">
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1 sm:gap-2 flex-wrap">
                           {isMainTeacher && (
                             <Button variant="ghost" size="sm" onClick={() => handleEditTeacher(teacher)}>
                               <Edit className="mr-2 h-4 w-4" />
@@ -523,10 +582,12 @@ export function TeachersManagement({ onStatsChange, isMainTeacher = true }: Teac
                       </TableCell>
                     </TableRow>
                   )
-                })
-              )}
-            </TableBody>
-          </Table>
+                })}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

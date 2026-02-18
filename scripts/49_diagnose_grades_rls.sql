@@ -64,3 +64,6 @@ LIMIT 5;
 -- You should see INSERT, UPDATE, DELETE policies for teachers
 -- ============================================================================
 
+
+
+

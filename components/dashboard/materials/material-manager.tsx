@@ -16,6 +16,17 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -27,6 +38,7 @@ import { createClient } from "@/lib/supabase/client"
 import { EmptyState } from "@/components/ui/empty-state"
 import { LoadingState } from "@/components/ui/loading-state"
 import { Badge } from "@/components/ui/badge"
+import { toast } from "sonner"
 
 interface Material {
   id: string
@@ -93,12 +105,19 @@ export function MaterialManager({ groupId, moduleId, lessonId, teacherId, onUpda
 
       if (error) {
         console.error("Error loading materials:", error)
+        toast.error("Failed to load materials", {
+          description: error.message || "Please try again",
+        })
+        setLoading(false)
         return
       }
 
       setMaterials(data || [])
     } catch (error) {
       console.error("Error loading materials:", error)
+      toast.error("An unexpected error occurred", {
+        description: error instanceof Error ? error.message : "Please try again",
+      })
     } finally {
       setLoading(false)
     }
@@ -126,24 +145,32 @@ export function MaterialManager({ groupId, moduleId, lessonId, teacherId, onUpda
         created_by: teacherId,
       })
 
-      if (!error) {
-        setIsCreateOpen(false)
-        setFormData({
-          title: "",
-          description: "",
-          material_type: "document",
-          file_url: "",
-          external_url: "",
-          duration_minutes: "",
-          is_required: false,
-        })
-        loadMaterials()
-        onUpdate?.()
-      } else {
+      if (error) {
         console.error("Error creating material:", error)
+        toast.error("Failed to create material", {
+          description: error.message || "Please try again",
+        })
+        return
       }
+
+      toast.success("Material created successfully")
+      setIsCreateOpen(false)
+      setFormData({
+        title: "",
+        description: "",
+        material_type: "document",
+        file_url: "",
+        external_url: "",
+        duration_minutes: "",
+        is_required: false,
+      })
+      loadMaterials()
+      onUpdate?.()
     } catch (error) {
       console.error("Error creating material:", error)
+      toast.error("An unexpected error occurred", {
+        description: error instanceof Error ? error.message : "Please try again",
+      })
     }
   }
 
@@ -326,13 +353,26 @@ export function MaterialManager({ groupId, moduleId, lessonId, teacherId, onUpda
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <Label htmlFor="file_url">File URL</Label>
+                  <Label htmlFor="file_url">
+                    {formData.material_type === "video" ? "Video URL" : formData.material_type === "audio" ? "Audio URL" : "File URL"}
+                  </Label>
                   <Input
                     id="file_url"
+                    type="url"
                     value={formData.file_url}
                     onChange={(e) => setFormData({ ...formData, file_url: e.target.value })}
-                    placeholder="/uploads/file.pdf or full URL"
+                    placeholder={
+                      formData.material_type === "video" 
+                        ? "https://youtube.com/watch?v=... or https://example.com/video.mp4"
+                        : formData.material_type === "audio"
+                        ? "https://example.com/audio.mp3"
+                        : "https://example.com/file.pdf or https://drive.google.com/file/..."
+                    }
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Enter the full URL where the {formData.material_type === "video" ? "video" : formData.material_type === "audio" ? "audio" : "file"} can be accessed. 
+                    This can be a direct link to the file or a page where it can be viewed.
+                  </p>
                 </div>
               )}
               {(formData.material_type === "video" || formData.material_type === "audio") && (
@@ -374,7 +414,7 @@ export function MaterialManager({ groupId, moduleId, lessonId, teacherId, onUpda
 
       {materials.length === 0 ? (
         <EmptyState
-          icon={<FileText className="h-12 w-12" />}
+          icon={FileText}
           title="No materials yet"
           description="Add your first learning resource to help students learn"
         />
@@ -408,19 +448,30 @@ export function MaterialManager({ groupId, moduleId, lessonId, teacherId, onUpda
                         {material.file_size && <span>Size: {formatFileSize(material.file_size)}</span>}
                       </div>
                       <div className="flex gap-2 mt-3">
-                        {material.external_url && (
-                          <Button variant="outline" size="sm" asChild>
-                            <a href={material.external_url} target="_blank" rel="noopener noreferrer">
-                              <ExternalLink className="mr-2 h-4 w-4" />
-                              Open Link
-                            </a>
-                          </Button>
-                        )}
-                        {material.file_url && (
-                          <Button variant="outline" size="sm" asChild>
-                            <a href={material.file_url} target="_blank" rel="noopener noreferrer">
-                              <FileText className="mr-2 h-4 w-4" />
-                              View File
+                        {(material.external_url || material.file_url) && (
+                          <Button variant="default" size="sm" asChild>
+                            <a 
+                              href={material.external_url || material.file_url || "#"} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2"
+                            >
+                              {material.material_type === "video" ? (
+                                <>
+                                  <Video className="h-4 w-4" />
+                                  Watch Video
+                                </>
+                              ) : material.material_type === "link" ? (
+                                <>
+                                  <ExternalLink className="h-4 w-4" />
+                                  Open Link
+                                </>
+                              ) : (
+                                <>
+                                  <FileText className="h-4 w-4" />
+                                  Open File
+                                </>
+                              )}
                             </a>
                           </Button>
                         )}
@@ -517,12 +568,25 @@ export function MaterialManager({ groupId, moduleId, lessonId, teacherId, onUpda
               </div>
             ) : (
               <div className="space-y-2">
-                <Label htmlFor="edit-file_url">File URL</Label>
+                <Label htmlFor="edit-file_url">
+                  {formData.material_type === "video" ? "Video URL" : formData.material_type === "audio" ? "Audio URL" : "File URL"}
+                </Label>
                 <Input
                   id="edit-file_url"
+                  type="url"
                   value={formData.file_url}
                   onChange={(e) => setFormData({ ...formData, file_url: e.target.value })}
+                  placeholder={
+                    formData.material_type === "video" 
+                      ? "https://youtube.com/watch?v=... or https://example.com/video.mp4"
+                      : formData.material_type === "audio"
+                      ? "https://example.com/audio.mp3"
+                      : "https://example.com/file.pdf or https://drive.google.com/file/..."
+                  }
                 />
+                <p className="text-xs text-muted-foreground">
+                  Enter the full URL where the {formData.material_type === "video" ? "video" : formData.material_type === "audio" ? "audio" : "file"} can be accessed.
+                </p>
               </div>
             )}
             {(formData.material_type === "video" || formData.material_type === "audio") && (

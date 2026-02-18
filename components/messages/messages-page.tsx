@@ -24,6 +24,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createClient } from "@/lib/supabase/client"
 import { format } from "date-fns"
 import { toast } from "sonner"
+import { handleDatabaseError } from "@/lib/error-handler"
+import { Skeleton, SkeletonCard } from "@/components/ui/skeleton-loader"
+import { EmptyState } from "@/components/ui/empty-state"
 
 interface MessagesPageProps {
   user: User
@@ -42,6 +45,7 @@ export function MessagesPage({ user }: MessagesPageProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string>("")
 
   const [formData, setFormData] = useState({
     recipient_id: "",
@@ -58,19 +62,22 @@ export function MessagesPage({ user }: MessagesPageProps) {
 
   const loadMessages = async () => {
     setLoading(true)
+    setError("")
     const supabase = createClient()
 
     try {
       if (view === "inbox") {
         // Load messages where current user is the recipient
-        const { data, error } = await supabase
+        const { data, error: dbError } = await supabase
           .from("messages")
           .select("*")
           .eq("recipient_id", user.id)
           .order("created_at", { ascending: false })
 
-        if (error) {
-          console.error("Error loading inbox messages:", error)
+        if (dbError) {
+          const errorInfo = handleDatabaseError(dbError, "Failed to load messages")
+          setError(errorInfo.message)
+          toast.error(errorInfo.message)
           setMessages([])
           setLoading(false)
           return
@@ -131,7 +138,9 @@ export function MessagesPage({ user }: MessagesPageProps) {
         }
       }
     } catch (error) {
-      console.error("Error loading messages:", error)
+      const errorInfo = handleDatabaseError(error, "Failed to load messages")
+      setError(errorInfo.message)
+      toast.error(errorInfo.message)
       setMessages([])
     } finally {
       setLoading(false)
@@ -377,15 +386,15 @@ export function MessagesPage({ user }: MessagesPageProps) {
 
   return (
     <DashboardLayout user={user}>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="space-y-4 sm:space-y-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Messages</h1>
-            <p className="text-muted-foreground">Communicate with teachers, students, and parents</p>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Messages</h1>
+            <p className="text-sm sm:text-base text-muted-foreground mt-1">Communicate with teachers, students, and parents</p>
           </div>
           <Dialog open={isComposeOpen} onOpenChange={setIsComposeOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="w-full sm:w-auto">
                 <Plus className="mr-2 h-4 w-4" />
                 Compose Message
               </Button>
@@ -454,7 +463,15 @@ export function MessagesPage({ user }: MessagesPageProps) {
           </Dialog>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-12">
+        {error && (
+          <Card className="border-destructive bg-destructive/10">
+            <CardContent className="pt-6">
+              <p className="text-sm text-destructive">{error}</p>
+            </CardContent>
+          </Card>
+        )}
+
+        <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-12">
           {/* Message List */}
           <div className="lg:col-span-5">
             <Card>
@@ -501,22 +518,32 @@ export function MessagesPage({ user }: MessagesPageProps) {
                 </div>
               </CardHeader>
               <CardContent className="p-0">
-                <ScrollArea className="h-[600px]">
+                <ScrollArea className="h-[400px] sm:h-[600px]">
                   {loading ? (
-                    <div className="text-center py-12 px-4 text-muted-foreground">
-                      <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50 animate-pulse" />
-                      <p>Loading messages...</p>
+                    <div className="space-y-4 p-4">
+                      {[...Array(3)].map((_, i) => (
+                        <Skeleton key={i} variant="rectangular" className="h-20 w-full" />
+                      ))}
                     </div>
                   ) : filteredMessages.length === 0 ? (
-                    <div className="text-center py-12 px-4 text-muted-foreground">
-                      <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>
-                        {searchTerm
-                          ? "No messages found"
-                          : view === "inbox"
-                            ? "No messages in inbox"
-                            : "No sent messages"}
-                      </p>
+                    <div className="p-4">
+                      <EmptyState
+                        icon={MessageSquare}
+                        title={
+                          searchTerm
+                            ? "No messages found"
+                            : view === "inbox"
+                              ? "No messages in inbox"
+                              : "No sent messages"
+                        }
+                        description={
+                          searchTerm
+                            ? "Try adjusting your search query"
+                            : view === "inbox"
+                              ? "You'll see messages here when you receive them"
+                              : "Messages you send will appear here"
+                        }
+                      />
                     </div>
                   ) : (
                     <div className="divide-y">
@@ -612,10 +639,11 @@ export function MessagesPage({ user }: MessagesPageProps) {
                     )}
                   </div>
                 ) : (
-                  <div className="text-center py-16 text-muted-foreground">
-                    <MessageSquare className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                    <p>Select a message to view</p>
-                  </div>
+                  <EmptyState
+                    icon={MessageSquare}
+                    title="Select a message"
+                    description="Choose a message from the list to view its details"
+                  />
                 )}
               </CardContent>
             </Card>

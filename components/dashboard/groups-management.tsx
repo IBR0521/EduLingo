@@ -244,17 +244,17 @@ export function GroupsManagement({ isMainTeacher, currentUserId, onStatsChange }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold">{isMainTeacher ? "Groups Management" : "My Groups"}</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-xl sm:text-2xl font-bold">{isMainTeacher ? "Groups Management" : "My Groups"}</h2>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">
             {isMainTeacher ? "Create and manage class groups" : "Manage your assigned groups"}
           </p>
         </div>
         {isMainTeacher && (
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="w-full sm:w-auto">
                 <Plus className="mr-2 h-4 w-4" />
                 Create Group
               </Button>
@@ -318,12 +318,12 @@ export function GroupsManagement({ isMainTeacher, currentUserId, onStatsChange }
 
       <Card>
         <CardHeader>
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <CardTitle>All Groups</CardTitle>
-              <CardDescription>Manage and organize class groups</CardDescription>
+              <CardTitle className="text-lg sm:text-xl">All Groups</CardTitle>
+              <CardDescription className="text-sm">Manage and organize class groups</CardDescription>
             </div>
-            <div className="relative w-full md:w-64">
+            <div className="relative w-full sm:w-64">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search groups..."
@@ -356,43 +356,45 @@ export function GroupsManagement({ isMainTeacher, currentUserId, onStatsChange }
 
             return filteredGroups.length === 0 ? (
               <EmptyState
-                icon={<BookOpen className="h-12 w-12" />}
+                icon={BookOpen}
                 title={searchQuery ? "No groups found" : "No groups yet"}
                 description={searchQuery ? "Try adjusting your search query" : "Create your first group to start organizing classes"}
               />
             ) : (
               <>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Group Name</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead>Assigned Teacher</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paginatedGroups.map((group) => (
-                      <TableRow key={group.id}>
-                        <TableCell className="font-medium">{group.name}</TableCell>
-                        <TableCell className="text-muted-foreground">{group.description || "No description"}</TableCell>
-                        <TableCell>
-                          {group.teacher ? (
-                            <span className="text-sm">{group.teacher.full_name}</span>
-                          ) : (
-                            <span className="text-sm text-muted-foreground">Not assigned</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
+                <div className="overflow-x-auto -mx-4 sm:mx-0">
+                  <div className="inline-block min-w-full align-middle px-4 sm:px-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="min-w-[150px]">Group Name</TableHead>
+                          <TableHead className="min-w-[200px] hidden sm:table-cell">Description</TableHead>
+                          <TableHead className="min-w-[150px]">Teacher</TableHead>
+                          <TableHead className="text-right min-w-[120px]">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {paginatedGroups.map((group) => (
+                          <TableRow key={group.id}>
+                            <TableCell className="font-medium">{group.name}</TableCell>
+                            <TableCell className="text-muted-foreground hidden sm:table-cell">{group.description || "No description"}</TableCell>
+                            <TableCell>
+                              {group.teacher ? (
+                                <span className="text-sm">{group.teacher.full_name}</span>
+                              ) : (
+                                <span className="text-sm text-muted-foreground">Not assigned</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-1 sm:gap-2">
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => setSelectedGroup(group)}
-                              className="mr-2"
+                              className="mr-1 sm:mr-2"
                             >
-                              <Users className="mr-2 h-4 w-4" />
-                              Manage
+                              <Users className="mr-1 sm:mr-2 h-4 w-4" />
+                              <span className="hidden sm:inline">Manage</span>
                             </Button>
                             {/* Teachers can edit their own groups, main teachers can edit all */}
                             {isMainTeacher || group.teacher_id === currentUserId ? (
@@ -430,8 +432,10 @@ export function GroupsManagement({ isMainTeacher, currentUserId, onStatsChange }
                         </TableCell>
                       </TableRow>
                     ))}
-                  </TableBody>
-                </Table>
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
                 {totalPages > 1 && (
                   <div className="mt-4 flex justify-center">
                     <Pagination>

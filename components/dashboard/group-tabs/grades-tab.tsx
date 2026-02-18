@@ -34,6 +34,9 @@ import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { LoadingState } from "@/components/ui/loading-state"
 import { format } from "date-fns"
+import { handleDatabaseError } from "@/lib/error-handler"
+import { SkeletonTable } from "@/components/ui/skeleton-loader"
+import { EmptyState } from "@/components/ui/empty-state"
 
 interface GradesTabProps {
   groupId: string
@@ -290,7 +293,7 @@ export function GradesTab({ groupId, students, teacherId }: GradesTabProps) {
   }
 
   if (loading) {
-    return <LoadingState message="Loading grades..." />
+    return <SkeletonTable />
   }
 
   const selectedStudentGrades = selectedStudentId ? grades[selectedStudentId] || [] : []
@@ -300,19 +303,19 @@ export function GradesTab({ groupId, students, teacherId }: GradesTabProps) {
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <CardTitle>Grades & Performance</CardTitle>
-              <CardDescription>Track student grades and academic performance</CardDescription>
+              <CardTitle className="text-lg sm:text-xl">Grades & Performance</CardTitle>
+              <CardDescription className="text-sm">Track student grades and academic performance</CardDescription>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={loadData}>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button variant="outline" size="sm" onClick={loadData} className="flex-1 sm:flex-initial">
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Refresh
               </Button>
               <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
                 <DialogTrigger asChild>
-                  <Button>
+                  <Button className="flex-1 sm:flex-initial">
                     <Plus className="mr-2 h-4 w-4" />
                     Add Grade
                   </Button>
@@ -403,25 +406,27 @@ export function GradesTab({ groupId, students, teacherId }: GradesTabProps) {
           </div>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Student Name</TableHead>
-                <TableHead>Recent Grades</TableHead>
-                <TableHead>Average</TableHead>
-                <TableHead>Trend</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {students.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground">
-                    No students in this group
-                  </TableCell>
-                </TableRow>
-              ) : (
-                students.map((student) => {
+          {students.length === 0 ? (
+            <EmptyState
+              icon={TrendingUp}
+              title="No students in this group"
+              description="Add students to this group to track grades"
+            />
+          ) : (
+            <div className="overflow-x-auto -mx-4 sm:mx-0">
+              <div className="inline-block min-w-full align-middle px-4 sm:px-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="min-w-[150px]">Student Name</TableHead>
+                      <TableHead className="min-w-[150px]">Recent Grades</TableHead>
+                      <TableHead className="min-w-[100px]">Average</TableHead>
+                      <TableHead className="min-w-[100px] hidden sm:table-cell">Trend</TableHead>
+                      <TableHead className="text-right min-w-[100px]">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {students.map((student) => {
                   const studentGrades = grades[student.id] || []
                   const average = calculateAverage(studentGrades)
                   const trend = calculateTrend(studentGrades)
@@ -455,7 +460,7 @@ export function GradesTab({ groupId, students, teacherId }: GradesTabProps) {
                           {studentGrades.length > 0 ? average : "-"}
                         </span>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden sm:table-cell">
                         {trend !== null ? (
                           <div className="flex items-center gap-1">
                             <TrendingUp className={`h-4 w-4 ${trend >= 0 ? "text-green-600" : "text-red-600"}`} />
@@ -467,8 +472,8 @@ export function GradesTab({ groupId, students, teacherId }: GradesTabProps) {
                           <span className="text-sm text-muted-foreground">-</span>
                         )}
                       </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1 sm:gap-2">
                           <Button
                             variant="ghost"
                             size="sm"
@@ -481,10 +486,12 @@ export function GradesTab({ groupId, students, teacherId }: GradesTabProps) {
                       </TableCell>
                     </TableRow>
                   )
-                })
-              )}
-            </TableBody>
-          </Table>
+                })}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

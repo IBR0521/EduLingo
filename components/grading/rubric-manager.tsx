@@ -409,7 +409,7 @@ export function RubricManager({ assignmentId, courseId, currentUserId, onRubricS
         <LoadingState message="Loading rubrics..." />
       ) : rubrics.length === 0 && !error ? (
         <EmptyState
-          icon={<FileText className="h-8 w-8" />}
+          icon={FileText}
           title="No rubrics found"
           description="Create your first rubric to get started"
           action={

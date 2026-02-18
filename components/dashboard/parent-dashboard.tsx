@@ -23,6 +23,10 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { createClient } from "@/lib/supabase/client"
 import { format } from "date-fns"
+import { handleDatabaseError } from "@/lib/error-handler"
+import { useToastNotification } from "@/hooks/use-toast-notification"
+import { Skeleton, SkeletonCard } from "@/components/ui/skeleton-loader"
+import { EmptyState } from "@/components/ui/empty-state"
 
 interface ParentDashboardProps {
   user: User
@@ -50,9 +54,14 @@ export function ParentDashboard({ user }: ParentDashboardProps) {
   const [assignments, setAssignments] = useState<(Assignment & { group?: Group })[]>([])
   const [grades, setGrades] = useState<Grade[]>([])
   const [attendance, setAttendance] = useState<Attendance[]>([])
+  const [loading, setLoading] = useState(true)
+  const [detailsLoading, setDetailsLoading] = useState(false)
+  const [error, setError] = useState<string>("")
+  const toast = useToastNotification()
 
   useEffect(() => {
     loadLinkedStudents()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -62,19 +71,30 @@ export function ParentDashboard({ user }: ParentDashboardProps) {
   }, [selectedStudent])
 
   const loadLinkedStudents = async () => {
-    const supabase = createClient()
+    setLoading(true)
+    setError("")
+    try {
+      const supabase = createClient()
 
-    const { data } = await supabase
-      .from("parent_student")
-      .select(
-        `
-        student:student_id(*)
-      `,
-      )
-      .eq("parent_id", user.id)
-      .eq("is_linked", true)
+      const { data, error: linkError } = await supabase
+        .from("parent_student")
+        .select(
+          `
+          student:student_id(*)
+        `,
+        )
+        .eq("parent_id", user.id)
+        .eq("is_linked", true)
 
-    if (data) {
+      if (linkError) {
+        const errorInfo = handleDatabaseError(linkError, "Failed to load linked students")
+        setError(errorInfo.message)
+        toast.showError(errorInfo.message)
+        setLoading(false)
+        return
+      }
+
+      if (data) {
       interface ParentStudentLink {
         student: User
       }
@@ -91,9 +111,16 @@ export function ParentDashboard({ user }: ParentDashboardProps) {
 
       setLinkedStudents(studentsWithStats)
 
-      if (studentsWithStats.length > 0 && !selectedStudent) {
-        setSelectedStudent(studentsWithStats[0])
+        if (studentsWithStats.length > 0 && !selectedStudent) {
+          setSelectedStudent(studentsWithStats[0])
+        }
       }
+    } catch (error) {
+      const errorInfo = handleDatabaseError(error, "Failed to load linked students")
+      setError(errorInfo.message)
+      toast.showError(errorInfo.message)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -183,6 +210,8 @@ export function ParentDashboard({ user }: ParentDashboardProps) {
   }
 
   const loadStudentDetails = async (studentId: string) => {
+    setDetailsLoading(true)
+    try {
     const supabase = createClient()
 
     // Load groups for this student
@@ -435,17 +464,35 @@ export function ParentDashboard({ user }: ParentDashboardProps) {
     return new Date(dueDate) < new Date()
   }
 
+  if (loading) {
+    return (
+      <DashboardLayout user={user}>
+        <div className="space-y-4 sm:space-y-6">
+          <div>
+            <Skeleton variant="text" className="h-8 w-64 mb-2" />
+            <Skeleton variant="text" className="h-4 w-96" />
+          </div>
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            {[...Array(3)].map((_, i) => (
+              <SkeletonCard key={i} />
+            ))}
+          </div>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
   return (
     <DashboardLayout user={user}>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="space-y-4 sm:space-y-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Parent Dashboard</h1>
-            <p className="text-muted-foreground">Monitor your child's progress and performance</p>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight">Parent Dashboard</h1>
+            <p className="text-sm sm:text-base text-muted-foreground mt-1">Monitor your child's progress and performance</p>
           </div>
           <Dialog open={isLinkOpen} onOpenChange={setIsLinkOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="w-full sm:w-auto">
                 <UserPlus className="mr-2 h-4 w-4" />
                 Link Student
               </Button>
@@ -504,20 +551,26 @@ export function ParentDashboard({ user }: ParentDashboardProps) {
           </Dialog>
         </div>
 
+        {error && (
+          <Card className="border-destructive bg-destructive/10">
+            <CardContent className="pt-6">
+              <p className="text-sm text-destructive">{error}</p>
+            </CardContent>
+          </Card>
+        )}
+
         {linkedStudents.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <h3 className="text-lg font-semibold mb-2">No Students Linked</h3>
-              <p className="text-muted-foreground mb-4">
-                Link your child's account using their access code to see their progress
-              </p>
+          <EmptyState
+            icon={Users}
+            title="No Students Linked"
+            description="Link your child's account using their access code to see their progress"
+            action={
               <Button onClick={() => setIsLinkOpen(true)}>
                 <UserPlus className="mr-2 h-4 w-4" />
                 Link Student Account
               </Button>
-            </CardContent>
-          </Card>
+            }
+          />
         ) : (
           <>
             {linkedStudents.length > 1 && (
@@ -543,14 +596,23 @@ export function ParentDashboard({ user }: ParentDashboardProps) {
 
             {selectedStudent && (
               <>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {detailsLoading && (
+                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                    {[...Array(3)].map((_, i) => (
+                      <SkeletonCard key={i} />
+                    ))}
+                  </div>
+                )}
+                {!detailsLoading && (
+                  <>
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">Average Grade</CardTitle>
                       <TrendingUp className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{selectedStudent.stats?.averageGrade.toFixed(1) || 0}%</div>
+                      <div className="text-xl sm:text-2xl font-bold">{selectedStudent.stats?.averageGrade.toFixed(1) || 0}%</div>
                       <Progress value={selectedStudent.stats?.averageGrade || 0} className="mt-2" />
                     </CardContent>
                   </Card>
@@ -561,7 +623,7 @@ export function ParentDashboard({ user }: ParentDashboardProps) {
                       <CheckCircle className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{selectedStudent.stats?.attendanceRate.toFixed(0) || 0}%</div>
+                      <div className="text-xl sm:text-2xl font-bold">{selectedStudent.stats?.attendanceRate.toFixed(0) || 0}%</div>
                       <Progress value={selectedStudent.stats?.attendanceRate || 0} className="mt-2" />
                     </CardContent>
                   </Card>
@@ -572,13 +634,13 @@ export function ParentDashboard({ user }: ParentDashboardProps) {
                       <BookOpen className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{selectedStudent.groups?.length || 0}</div>
+                      <div className="text-xl sm:text-2xl font-bold">{selectedStudent.groups?.length || 0}</div>
                       <p className="text-xs text-muted-foreground">Active classes</p>
                     </CardContent>
                   </Card>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
                   <Card>
                     <CardHeader>
                       <CardTitle>Upcoming Classes</CardTitle>
@@ -586,7 +648,11 @@ export function ParentDashboard({ user }: ParentDashboardProps) {
                     </CardHeader>
                     <CardContent>
                       {upcomingClasses.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">No upcoming classes</p>
+                        <EmptyState
+                          icon={Calendar}
+                          title="No upcoming classes"
+                          description="No scheduled classes at the moment"
+                        />
                       ) : (
                         <div className="space-y-3">
                           {upcomingClasses.map((schedule) => (
@@ -612,7 +678,11 @@ export function ParentDashboard({ user }: ParentDashboardProps) {
                     </CardHeader>
                     <CardContent>
                       {assignments.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">No assignments</p>
+                        <EmptyState
+                          icon={ClipboardList}
+                          title="No assignments"
+                          description="No assignments at the moment"
+                        />
                       ) : (
                         <div className="space-y-3">
                           {assignments.slice(0, 5).map((assignment) => (
@@ -640,7 +710,7 @@ export function ParentDashboard({ user }: ParentDashboardProps) {
                   </Card>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
                   <Card>
                     <CardHeader>
                       <CardTitle>Recent Grades</CardTitle>
@@ -648,9 +718,14 @@ export function ParentDashboard({ user }: ParentDashboardProps) {
                     </CardHeader>
                     <CardContent>
                       {grades.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">No grades yet</p>
+                        <EmptyState
+                          icon={TrendingUp}
+                          title="No grades yet"
+                          description="Grades will appear here once recorded"
+                        />
                       ) : (
-                        <Table>
+                        <div className="overflow-x-auto">
+                          <Table>
                           <TableHeader>
                             <TableRow>
                               <TableHead>Category</TableHead>
@@ -672,6 +747,7 @@ export function ParentDashboard({ user }: ParentDashboardProps) {
                             ))}
                           </TableBody>
                         </Table>
+                        </div>
                       )}
                     </CardContent>
                   </Card>
@@ -683,9 +759,14 @@ export function ParentDashboard({ user }: ParentDashboardProps) {
                     </CardHeader>
                     <CardContent>
                       {attendance.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">No attendance records</p>
+                        <EmptyState
+                          icon={CheckCircle}
+                          title="No attendance records"
+                          description="Attendance records will appear here"
+                        />
                       ) : (
-                        <Table>
+                        <div className="overflow-x-auto">
+                          <Table>
                           <TableHeader>
                             <TableRow>
                               <TableHead>Date</TableHead>
@@ -717,6 +798,7 @@ export function ParentDashboard({ user }: ParentDashboardProps) {
                             ))}
                           </TableBody>
                         </Table>
+                        </div>
                       )}
                     </CardContent>
                   </Card>
@@ -729,9 +811,13 @@ export function ParentDashboard({ user }: ParentDashboardProps) {
                   </CardHeader>
                   <CardContent>
                     {!selectedStudent.groups || selectedStudent.groups.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">Not enrolled in any groups</p>
+                      <EmptyState
+                        icon={BookOpen}
+                        title="Not enrolled in any groups"
+                        description="Student is not currently enrolled in any classes"
+                      />
                     ) : (
-                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                         {selectedStudent.groups.map((group) => (
                           <Card key={group.id}>
                             <CardHeader>
@@ -752,6 +838,8 @@ export function ParentDashboard({ user }: ParentDashboardProps) {
                     )}
                   </CardContent>
                 </Card>
+                </>
+                )}
               </>
             )}
           </>

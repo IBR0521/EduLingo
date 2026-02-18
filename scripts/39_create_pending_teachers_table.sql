@@ -32,3 +32,6 @@ CREATE POLICY "Service role has full access to pending_teachers" ON pending_teac
 FOR ALL USING (true) WITH CHECK (true);
 
 
+
+
+

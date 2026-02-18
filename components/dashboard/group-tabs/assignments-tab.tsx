@@ -35,6 +35,8 @@ import { Badge } from "@/components/ui/badge"
 import { LoadingState } from "@/components/ui/loading-state"
 import { EmptyState } from "@/components/ui/empty-state"
 import { toast } from "sonner"
+import { handleDatabaseError } from "@/lib/error-handler"
+import { SkeletonTable } from "@/components/ui/skeleton-loader"
 import { uploadFileToStorage, deleteFileFromStorage } from "@/lib/storage"
 import { sendPushNotification } from "@/lib/send-push-notification"
 
@@ -66,6 +68,7 @@ export function AssignmentsTab({ groupId, teacherId }: AssignmentsTabProps) {
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [assignmentFiles, setAssignmentFiles] = useState<Record<string, FileRecord[]>>({})
   const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState<string>("")
 
   useEffect(() => {
     loadAssignments()
@@ -73,30 +76,37 @@ export function AssignmentsTab({ groupId, teacherId }: AssignmentsTabProps) {
 
   const loadAssignments = async () => {
     setLoading(true)
-    const supabase = createClient()
-    const { data, error } = await supabase
-      .from("assignments")
-      .select("*")
-      .eq("group_id", groupId)
-      .order("due_date", { ascending: true })
+    setError("")
+    try {
+      const supabase = createClient()
+      const { data, error: dbError } = await supabase
+        .from("assignments")
+        .select("*")
+        .eq("group_id", groupId)
+        .order("due_date", { ascending: true })
 
-    if (error) {
-      console.error("Error loading assignments:", error)
-      toast.error("Failed to load assignments", {
-        description: error.message || "Please try again later",
-      })
+      if (dbError) {
+        const errorInfo = handleDatabaseError(dbError, "Failed to load assignments")
+        setError(errorInfo.message)
+        toast.error(errorInfo.message)
+        setLoading(false)
+        return
+      }
+
+      if (data) {
+        setAssignments(data)
+        // Load files for each assignment
+        data.forEach((assignment) => {
+          loadAssignmentFiles(assignment.id)
+        })
+      }
+    } catch (error) {
+      const errorInfo = handleDatabaseError(error, "Failed to load assignments")
+      setError(errorInfo.message)
+      toast.error(errorInfo.message)
+    } finally {
       setLoading(false)
-      return
     }
-
-    if (data) {
-      setAssignments(data)
-      // Load files for each assignment
-      data.forEach((assignment) => {
-        loadAssignmentFiles(assignment.id)
-      })
-    }
-    setLoading(false)
   }
 
   const loadAssignmentFiles = async (assignmentId: string) => {
@@ -330,14 +340,14 @@ export function AssignmentsTab({ groupId, teacherId }: AssignmentsTabProps) {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <CardTitle>Assignments & Homework</CardTitle>
-            <CardDescription>Manage assignments for this group</CardDescription>
+            <CardTitle className="text-lg sm:text-xl">Assignments & Homework</CardTitle>
+            <CardDescription className="text-sm">Manage assignments for this group</CardDescription>
           </div>
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="w-full sm:w-auto">
                 <Plus className="mr-2 h-4 w-4" />
                 Create Assignment
               </Button>
@@ -390,23 +400,30 @@ export function AssignmentsTab({ groupId, teacherId }: AssignmentsTabProps) {
         </div>
       </CardHeader>
       <CardContent>
+        {error && (
+          <div className="mb-4 p-3 border border-destructive bg-destructive/10 rounded-md">
+            <p className="text-sm text-destructive">{error}</p>
+          </div>
+        )}
         {loading ? (
-          <LoadingState message="Loading assignments..." />
+          <SkeletonTable />
         ) : assignments.length === 0 ? (
           <EmptyState
-            icon={<ClipboardList className="h-12 w-12" />}
+            icon={ClipboardList}
             title="No assignments yet"
             description="Create your first assignment for this group"
           />
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Assignment Title</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Due Date</TableHead>
-                <TableHead>Files</TableHead>
-                <TableHead>Status</TableHead>
+          <div className="overflow-x-auto -mx-4 sm:mx-0">
+            <div className="inline-block min-w-full align-middle px-4 sm:px-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[150px]">Title</TableHead>
+                    <TableHead className="min-w-[200px] hidden md:table-cell">Description</TableHead>
+                    <TableHead className="min-w-[150px]">Due Date</TableHead>
+                    <TableHead className="min-w-[100px]">Files</TableHead>
+                    <TableHead className="min-w-[100px]">Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -477,8 +494,10 @@ export function AssignmentsTab({ groupId, teacherId }: AssignmentsTabProps) {
                   </TableRow>
                 )
               })}
-            </TableBody>
-          </Table>
+                </TableBody>
+              </Table>
+            </div>
+          </div>
         )}
 
         {/* Show files for each assignment */}

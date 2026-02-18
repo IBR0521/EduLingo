@@ -301,7 +301,7 @@ export function LearningPathViewer({ groupId, studentId }: LearningPathViewerPro
   if (modules.length === 0) {
     return (
       <EmptyState
-        icon={<BookOpen className="h-12 w-12" />}
+        icon={BookOpen}
         title="No learning path available"
         description="Your teacher hasn't set up a learning path for this course yet."
       />

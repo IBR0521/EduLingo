@@ -73,12 +73,19 @@ export function ModuleManager({ groupId, teacherId }: ModuleManagerProps) {
 
       if (error) {
         console.error("Error loading modules:", error)
+        toast.error("Failed to load modules", {
+          description: error.message || "Please try again",
+        })
+        setLoading(false)
         return
       }
 
       setModules(data || [])
     } catch (error) {
       console.error("Error loading modules:", error)
+      toast.error("An unexpected error occurred", {
+        description: error instanceof Error ? error.message : "Please try again",
+      })
     } finally {
       setLoading(false)
     }
@@ -100,15 +107,23 @@ export function ModuleManager({ groupId, teacherId }: ModuleManagerProps) {
         created_by: teacherId,
       })
 
-      if (!error) {
-        setIsCreateOpen(false)
-        setFormData({ title: "", description: "", is_published: false })
-        loadModules()
-      } else {
+      if (error) {
         console.error("Error creating module:", error)
+        toast.error("Failed to create module", {
+          description: error.message || "Please try again",
+        })
+        return
       }
+
+      toast.success("Module created successfully")
+      setIsCreateOpen(false)
+      setFormData({ title: "", description: "", is_published: false })
+      loadModules()
     } catch (error) {
       console.error("Error creating module:", error)
+      toast.error("An unexpected error occurred", {
+        description: error instanceof Error ? error.message : "Please try again",
+      })
     }
   }
 
@@ -137,16 +152,24 @@ export function ModuleManager({ groupId, teacherId }: ModuleManagerProps) {
         })
         .eq("id", editingModule.id)
 
-      if (!error) {
-        setIsEditOpen(false)
-        setEditingModule(null)
-        setFormData({ title: "", description: "", is_published: false })
-        loadModules()
-      } else {
+      if (error) {
         console.error("Error updating module:", error)
+        toast.error("Failed to update module", {
+          description: error.message || "Please try again",
+        })
+        return
       }
+
+      toast.success("Module updated successfully")
+      setIsEditOpen(false)
+      setEditingModule(null)
+      setFormData({ title: "", description: "", is_published: false })
+      loadModules()
     } catch (error) {
       console.error("Error updating module:", error)
+      toast.error("An unexpected error occurred", {
+        description: error instanceof Error ? error.message : "Please try again",
+      })
     }
   }
 
@@ -243,7 +266,7 @@ export function ModuleManager({ groupId, teacherId }: ModuleManagerProps) {
 
       {modules.length === 0 ? (
         <EmptyState
-          icon={<BookOpen className="h-12 w-12" />}
+          icon={BookOpen}
           title="No modules yet"
           description="Create your first module to start organizing course content"
         />

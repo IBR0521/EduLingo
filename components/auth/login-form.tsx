@@ -26,7 +26,7 @@ export function LoginForm() {
     
     setLoading(true)
     setError("")
-
+    
     try {
       const supabase = createClient()
       
@@ -189,6 +189,10 @@ export function LoginForm() {
       if (!isNavigatingRef.current) {
         console.error("Login error:", err)
         setError(err instanceof Error ? err.message : "An unexpected error occurred")
+      }
+    } finally {
+      // Always reset loading state, even if navigation is in progress
+      if (!isNavigatingRef.current) {
         setLoading(false)
       }
     }

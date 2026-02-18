@@ -16,11 +16,25 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import { toast as sonnerToast } from "sonner"
+import { handleDatabaseError } from "@/lib/error-handler"
+import { SkeletonTable } from "@/components/ui/skeleton-loader"
+import { EmptyState } from "@/components/ui/empty-state"
 
 interface StudentsTabProps {
   groupId: string
@@ -49,24 +63,28 @@ export function StudentsTab({ groupId, students, onUpdate, isMainTeacher = false
   const [searchTerm, setSearchTerm] = useState("")
   const [monthlyPaymentAmount, setMonthlyPaymentAmount] = useState("")
   const [studentPayments, setStudentPayments] = useState<Record<string, GroupStudentWithPayment>>({})
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string>("")
 
   useEffect(() => {
     loadStudentPayments()
   }, [groupId, students])
 
   const loadStudentPayments = async () => {
+    setLoading(true)
+    setError("")
     try {
       const supabase = createClient()
-      const { data, error } = await supabase
+      const { data, error: dbError } = await supabase
         .from("group_students")
         .select("*")
         .eq("group_id", groupId)
 
-      if (error) {
-        console.error("Error loading student payments:", error)
-        sonnerToast.error("Failed to load payment data", {
-          description: error.message || "Please try again",
-        })
+      if (dbError) {
+        const errorInfo = handleDatabaseError(dbError, "Failed to load payment data")
+        setError(errorInfo.message)
+        sonnerToast.error(errorInfo.message)
+        setLoading(false)
         return
       }
 
@@ -88,10 +106,11 @@ export function StudentsTab({ groupId, students, onUpdate, isMainTeacher = false
         setStudentPayments(paymentsMap)
       }
     } catch (err) {
-      console.error("Unexpected error loading student payments:", err)
-      sonnerToast.error("Failed to load payment data", {
-        description: "An unexpected error occurred. Please try again.",
-      })
+      const errorInfo = handleDatabaseError(err, "Failed to load payment data")
+      setError(errorInfo.message)
+      sonnerToast.error(errorInfo.message)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -449,12 +468,12 @@ export function StudentsTab({ groupId, students, onUpdate, isMainTeacher = false
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <CardTitle>Students in Group</CardTitle>
-            <CardDescription>Manage students enrolled in this group</CardDescription>
+            <CardTitle className="text-lg sm:text-xl">Students in Group</CardTitle>
+            <CardDescription className="text-sm">Manage students enrolled in this group</CardDescription>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <Button
               variant="outline"
               size="sm"
@@ -463,6 +482,7 @@ export function StudentsTab({ groupId, students, onUpdate, isMainTeacher = false
                 onUpdate()
               }}
               title="Refresh payment data"
+              className="flex-1 sm:flex-initial"
             >
               <RefreshCw className="mr-2 h-4 w-4" />
               Refresh
@@ -476,7 +496,7 @@ export function StudentsTab({ groupId, students, onUpdate, isMainTeacher = false
             }}
           >
             <DialogTrigger asChild>
-              <Button>
+              <Button className="flex-1 sm:flex-initial">
                 <Plus className="mr-2 h-4 w-4" />
                 Add Student
               </Button>
@@ -537,6 +557,11 @@ export function StudentsTab({ groupId, students, onUpdate, isMainTeacher = false
         </div>
       </CardHeader>
       <CardContent>
+        {error && (
+          <div className="mb-4 p-3 border border-destructive bg-destructive/10 rounded-md">
+            <p className="text-sm text-destructive">{error}</p>
+          </div>
+        )}
         <div className="mb-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -544,30 +569,34 @@ export function StudentsTab({ groupId, students, onUpdate, isMainTeacher = false
               placeholder="Search students..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-10 w-full"
             />
           </div>
         </div>
 
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Student Name</TableHead>
-              <TableHead>Email</TableHead>
-                <TableHead>Monthly Payment</TableHead>
-                <TableHead>Payment Status</TableHead>
-                {isMainTeacher && <TableHead className="text-right">Actions</TableHead>}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredStudents.length === 0 ? (
-              <TableRow>
-                  <TableCell colSpan={isMainTeacher ? 5 : 4} className="text-center text-muted-foreground">
-                  {searchTerm ? "No students found" : "No students in this group"}
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredStudents.map((student) => {
+        {loading ? (
+          <SkeletonTable />
+        ) : filteredStudents.length === 0 ? (
+          <EmptyState
+            icon={Search}
+            title={searchTerm ? "No students found" : "No students in this group"}
+            description={searchTerm ? "Try adjusting your search query" : "Add students to this group"}
+          />
+        ) : (
+          <div className="overflow-x-auto -mx-4 sm:mx-0">
+            <div className="inline-block min-w-full align-middle px-4 sm:px-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[150px]">Student Name</TableHead>
+                    <TableHead className="min-w-[200px] hidden sm:table-cell">Email</TableHead>
+                    <TableHead className="min-w-[120px]">Payment</TableHead>
+                    <TableHead className="min-w-[150px]">Status</TableHead>
+                    {isMainTeacher && <TableHead className="text-right min-w-[100px]">Actions</TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredStudents.map((student) => {
                 const payment = studentPayments[student.id]
                 const paymentAmount = payment?.monthly_payment_amount
                 const paymentStatus = payment?.payment_status || null
@@ -575,8 +604,13 @@ export function StudentsTab({ groupId, students, onUpdate, isMainTeacher = false
                 
                 return (
                 <TableRow key={student.id}>
-                  <TableCell className="font-medium">{student.full_name}</TableCell>
-                  <TableCell className="text-muted-foreground">{student.email}</TableCell>
+                  <TableCell className="font-medium">
+                    <div>
+                      <div>{student.full_name}</div>
+                      <div className="text-xs text-muted-foreground sm:hidden">{student.email}</div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground hidden sm:table-cell">{student.email}</TableCell>
                     <TableCell>
                       {paymentAmount ? (
                         <span className="font-medium">{paymentAmount.toLocaleString()} UZS</span>
@@ -631,17 +665,38 @@ export function StudentsTab({ groupId, students, onUpdate, isMainTeacher = false
                     </TableCell>
                   <TableCell className="text-right">
                       {isMainTeacher && (
-                    <Button variant="ghost" size="icon" onClick={() => handleRemoveStudent(student.id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Remove Student from Group</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to remove {student.full_name} ({student.email}) from this group? 
+                                This will remove their enrollment and all associated data. This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleRemoveStudent(student.id)}>
+                                Remove Student
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       )}
                   </TableCell>
                 </TableRow>
                 )
-              })
-            )}
-          </TableBody>
-        </Table>
+              })}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   )

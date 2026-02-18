@@ -18,3 +18,6 @@ COMMENT ON COLUMN users.salary_status IS 'Salary payment status: paid, pending, 
 COMMENT ON COLUMN users.employment_start_date IS 'Date when teacher started employment';
 
 
+
+
+

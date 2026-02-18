@@ -96,3 +96,6 @@ console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
 2. **Check network tab** - In DevTools, go to "Network" tab and see if there's a request to Supabase
 3. **Check for errors** - Look for any red error messages in the console
 
+
+
+

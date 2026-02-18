@@ -31,6 +31,7 @@ export function NotificationsPage({ user }: NotificationsPageProps) {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [filter, setFilter] = useState<"all" | "unread">("all")
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string>("")
   const channelRef = useRef<any>(null)
   const { subscribe } = usePushNotifications(user.id)
 
@@ -61,6 +62,7 @@ export function NotificationsPage({ user }: NotificationsPageProps) {
 
   const loadNotifications = async () => {
     setLoading(true)
+    setError("")
     try {
       const supabase = createClient()
       
@@ -72,32 +74,26 @@ export function NotificationsPage({ user }: NotificationsPageProps) {
         return
       }
 
-      const { data, error } = await supabase
+      const { data, error: dbError } = await supabase
         .from("notifications")
         .select("*")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
 
-      if (error) {
-        console.error("Error loading notifications:", {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code,
-        })
-        toast.error("Failed to load notifications", {
-          description: error.message || error.details || "Please try again",
-        })
-        setNotifications([]) // Set empty array on error
+      if (dbError) {
+        const errorInfo = handleDatabaseError(dbError, "Failed to load notifications")
+        setError(errorInfo.message)
+        toast.error(errorInfo.message)
+        setNotifications([])
         setLoading(false)
         return
       }
 
       setNotifications(data || [])
     } catch (err: any) {
-      console.error("Unexpected error loading notifications:", {
-        message: err?.message,
-        stack: err?.stack,
+      const errorInfo = handleDatabaseError(err, "Failed to load notifications")
+      setError(errorInfo.message)
+      toast.error(errorInfo.message)
         name: err?.name,
       })
       toast.error("Failed to load notifications", {
@@ -230,17 +226,31 @@ export function NotificationsPage({ user }: NotificationsPageProps) {
     }
   }
 
+  if (loading) {
+    return (
+      <DashboardLayout user={user}>
+        <div className="space-y-4 sm:space-y-6">
+          <div>
+            <Skeleton variant="text" className="h-8 w-64 mb-2" />
+            <Skeleton variant="text" className="h-4 w-96" />
+          </div>
+          <SkeletonCard />
+        </div>
+      </DashboardLayout>
+    )
+  }
+
   return (
     <DashboardLayout user={user}>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between flex-wrap gap-4">
+      <div className="space-y-4 sm:space-y-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Notifications</h1>
-            <p className="text-muted-foreground">Stay updated with important information</p>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Notifications</h1>
+            <p className="text-sm sm:text-base text-muted-foreground mt-1">Stay updated with important information</p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
             {unreadCount > 0 && (
-              <Button onClick={handleMarkAllAsRead} variant="outline">
+              <Button onClick={handleMarkAllAsRead} variant="outline" className="flex-1 sm:flex-initial">
                 <CheckCheck className="mr-2 h-4 w-4" />
                 Mark All as Read
               </Button>
@@ -248,21 +258,30 @@ export function NotificationsPage({ user }: NotificationsPageProps) {
           </div>
         </div>
 
+        {error && (
+          <Card className="border-destructive bg-destructive/10">
+            <CardContent className="pt-6">
+              <p className="text-sm text-destructive">{error}</p>
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-center gap-2">
-                <CardTitle>All Notifications</CardTitle>
+                <CardTitle className="text-lg sm:text-xl">All Notifications</CardTitle>
                 {unreadCount > 0 && <Badge variant="destructive">{unreadCount} unread</Badge>}
               </div>
-              <div className="flex gap-2">
-                <Button variant={filter === "all" ? "default" : "outline"} size="sm" onClick={() => setFilter("all")}>
+              <div className="flex gap-2 w-full sm:w-auto">
+                <Button variant={filter === "all" ? "default" : "outline"} size="sm" onClick={() => setFilter("all")} className="flex-1 sm:flex-initial">
                   All
                 </Button>
                 <Button
                   variant={filter === "unread" ? "default" : "outline"}
                   size="sm"
                   onClick={() => setFilter("unread")}
+                  className="flex-1 sm:flex-initial"
                 >
                   Unread
                 </Button>
@@ -271,15 +290,17 @@ export function NotificationsPage({ user }: NotificationsPageProps) {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <Bell className="h-12 w-12 mx-auto mb-4 opacity-50 animate-pulse" />
-                <p>Loading notifications...</p>
+              <div className="space-y-4">
+                {[...Array(3)].map((_, i) => (
+                  <SkeletonCard key={i} />
+                ))}
               </div>
             ) : filteredNotifications.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <Bell className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>{filter === "unread" ? "No unread notifications" : "No notifications yet"}</p>
-              </div>
+              <EmptyState
+                icon={Bell}
+                title={filter === "unread" ? "No unread notifications" : "No notifications yet"}
+                description={filter === "unread" ? "All caught up!" : "You'll see notifications here when you receive them"}
+              />
             ) : (
               <div className="space-y-2">
                 {filteredNotifications.map((notification) => (
@@ -300,18 +321,19 @@ export function NotificationsPage({ user }: NotificationsPageProps) {
                         </span>
                       </div>
                       <p className="text-sm text-muted-foreground leading-relaxed">{notification.message}</p>
-                      <div className="flex items-center gap-2 pt-2">
+                      <div className="flex items-center gap-1 sm:gap-2 pt-2 flex-wrap">
                         {!notification.is_read && (
-                          <Button size="sm" variant="ghost" onClick={() => handleMarkAsRead(notification.id)}>
+                          <Button size="sm" variant="ghost" onClick={() => handleMarkAsRead(notification.id)} className="text-xs">
                             <Check className="mr-1 h-3 w-3" />
-                            Mark as read
+                            <span className="hidden sm:inline">Mark as read</span>
+                            <span className="sm:hidden">Read</span>
                           </Button>
                         )}
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button size="sm" variant="ghost">
+                            <Button size="sm" variant="ghost" className="text-xs">
                               <Trash2 className="mr-1 h-3 w-3" />
-                              Delete
+                              <span className="hidden sm:inline">Delete</span>
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>

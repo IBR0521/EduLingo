@@ -23,6 +23,8 @@ import { format } from "date-fns"
 import { LoadingState } from "@/components/ui/loading-state"
 import { EmptyState } from "@/components/ui/empty-state"
 import { toast } from "sonner"
+import { handleDatabaseError } from "@/lib/error-handler"
+import { SkeletonTable } from "@/components/ui/skeleton-loader"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -97,6 +99,7 @@ function nextOccurrenceDateTime(dayOfWeek: number, startTime: string, from: Date
 export function ScheduleTab({ groupId, teacherId, isStudentView = false }: ScheduleTabProps) {
   const [recurringClasses, setRecurringClasses] = useState<Schedule[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string>("")
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [editing, setEditing] = useState<Schedule | null>(null)
@@ -114,6 +117,7 @@ export function ScheduleTab({ groupId, teacherId, isStudentView = false }: Sched
 
   const loadSchedule = async () => {
     setLoading(true)
+    setError("")
     try {
       const supabase = createClient()
       const { data: recurringData, error: recurringError } = await supabase
@@ -125,10 +129,10 @@ export function ScheduleTab({ groupId, teacherId, isStudentView = false }: Sched
         .order("created_at", { ascending: false })
 
       if (recurringError) {
-        console.error("Error loading recurring schedule:", recurringError)
-        toast.error("Failed to load schedule", {
-          description: recurringError.message || "Please try again",
-        })
+        const errorInfo = handleDatabaseError(recurringError, "Failed to load schedule")
+        setError(errorInfo.message)
+        toast.error(errorInfo.message)
+        setLoading(false)
         return
       }
 
@@ -136,7 +140,9 @@ export function ScheduleTab({ groupId, teacherId, isStudentView = false }: Sched
       
       // Instances are generated in background for attendance - not displayed here
     } catch (error) {
-      console.error("Error loading schedule:", error)
+      const errorInfo = handleDatabaseError(error, "Failed to load schedule")
+      setError(errorInfo.message)
+      toast.error(errorInfo.message)
     } finally {
       setLoading(false)
     }
@@ -422,17 +428,17 @@ export function ScheduleTab({ groupId, teacherId, isStudentView = false }: Sched
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <CardTitle>Class Schedule</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-lg sm:text-xl">Class Schedule</CardTitle>
+            <CardDescription className="text-sm">
               {isStudentView ? "Your upcoming weekly classes" : "Set weekly recurring classes (Mon–Sun) for this group"}
             </CardDescription>
           </div>
           {!isStudentView && (
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="w-full sm:w-auto">
                 <Plus className="mr-2 h-4 w-4" />
                   Add Weekly Class
               </Button>
@@ -511,8 +517,13 @@ export function ScheduleTab({ groupId, teacherId, isStudentView = false }: Sched
         </div>
       </CardHeader>
       <CardContent>
+        {error && (
+          <div className="mb-4 p-3 border border-destructive bg-destructive/10 rounded-md">
+            <p className="text-sm text-destructive">{error}</p>
+          </div>
+        )}
         {loading ? (
-          <LoadingState message="Loading schedule..." />
+          <SkeletonTable />
         ) : (
           <div className="space-y-6">
             {/* Recurring weekly classes (manage) */}
@@ -520,19 +531,21 @@ export function ScheduleTab({ groupId, teacherId, isStudentView = false }: Sched
               <div>
                 {recurringClasses.length === 0 ? (
           <EmptyState
-            icon={<Calendar className="h-12 w-12" />}
+            icon={Calendar}
                     title="No weekly classes set"
                     description="Add a weekly class (Mon–Sun) and it will repeat every week."
           />
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                        <TableHead>Subject</TableHead>
-                        <TableHead>Days</TableHead>
-                        <TableHead>Time</TableHead>
-                <TableHead>Notes</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+          <div className="overflow-x-auto -mx-4 sm:mx-0">
+            <div className="inline-block min-w-full align-middle px-4 sm:px-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                        <TableHead className="min-w-[120px]">Subject</TableHead>
+                        <TableHead className="min-w-[150px]">Days</TableHead>
+                        <TableHead className="min-w-[120px]">Time</TableHead>
+                <TableHead className="min-w-[150px] hidden md:table-cell">Notes</TableHead>
+                <TableHead className="text-right min-w-[120px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -548,9 +561,9 @@ export function ScheduleTab({ groupId, teacherId, isStudentView = false }: Sched
                             <TableCell className="font-medium">{item.subject}</TableCell>
                             <TableCell>{days}</TableCell>
                             <TableCell>{formatTimeRange(item.date, item.duration_minutes || 60)}</TableCell>
-                            <TableCell className="text-muted-foreground">{item.notes || "-"}</TableCell>
+                            <TableCell className="text-muted-foreground hidden md:table-cell">{item.notes || "-"}</TableCell>
                             <TableCell className="text-right">
-                              <div className="flex justify-end gap-2">
+                              <div className="flex justify-end gap-1 sm:gap-2">
                                 <Button variant="ghost" size="icon" onClick={() => openEdit(item)}>
                                   <Pencil className="h-4 w-4" />
                                 </Button>
@@ -582,6 +595,8 @@ export function ScheduleTab({ groupId, teacherId, isStudentView = false }: Sched
                       })}
                     </TableBody>
                   </Table>
+                </div>
+              </div>
                 )}
               </div>
             )}

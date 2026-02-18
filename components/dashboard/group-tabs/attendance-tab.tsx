@@ -10,6 +10,9 @@ import { Calendar } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { format } from "date-fns"
 import { toast } from "sonner"
+import { handleDatabaseError } from "@/lib/error-handler"
+import { SkeletonTable } from "@/components/ui/skeleton-loader"
+import { EmptyState } from "@/components/ui/empty-state"
 
 interface AttendanceTabProps {
   groupId: string
@@ -24,6 +27,8 @@ export function AttendanceTab({ groupId, students, teacherId }: AttendanceTabPro
   const [selectedScheduleId, setSelectedScheduleId] = useState<string>("")
   const [attendance, setAttendance] = useState<Record<string, AttendanceStatus>>({})
   const [isSaving, setIsSaving] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string>("")
 
   useEffect(() => {
     loadSchedules()
@@ -36,19 +41,21 @@ export function AttendanceTab({ groupId, students, teacherId }: AttendanceTabPro
   }, [selectedScheduleId])
 
   const loadSchedules = async () => {
+    setLoading(true)
+    setError("")
     try {
       const supabase = createClient()
-      const { data, error } = await supabase
+      const { data, error: dbError } = await supabase
         .from("schedule")
         .select("*")
         .eq("group_id", groupId)
         .order("date", { ascending: false })
 
-      if (error) {
-        console.error("Error loading schedules:", error)
-        toast.error("Failed to load schedules", {
-          description: error.message || "Please try again",
-        })
+      if (dbError) {
+        const errorInfo = handleDatabaseError(dbError, "Failed to load schedules")
+        setError(errorInfo.message)
+        toast.error(errorInfo.message)
+        setLoading(false)
         return
       }
 
@@ -57,10 +64,11 @@ export function AttendanceTab({ groupId, students, teacherId }: AttendanceTabPro
         setSelectedScheduleId(data[0].id)
       }
     } catch (error) {
-      console.error("Unexpected error loading schedules:", error)
-      toast.error("An unexpected error occurred", {
-        description: error instanceof Error ? error.message : "Please try again",
-      })
+      const errorInfo = handleDatabaseError(error, "Failed to load schedules")
+      setError(errorInfo.message)
+      toast.error(errorInfo.message)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -199,29 +207,36 @@ export function AttendanceTab({ groupId, students, teacherId }: AttendanceTabPro
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <CardTitle>Attendance Tracking</CardTitle>
-            <CardDescription>Mark student attendance for each class</CardDescription>
+            <CardTitle className="text-lg sm:text-xl">Attendance Tracking</CardTitle>
+            <CardDescription className="text-sm">Mark student attendance for each class</CardDescription>
           </div>
-          <Button onClick={handleSave} disabled={isSaving || !selectedScheduleId}>
+          <Button onClick={handleSave} disabled={isSaving || !selectedScheduleId} className="w-full sm:w-auto">
             {isSaving ? "Saving..." : "Save Attendance"}
           </Button>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {schedules.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <Calendar className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p>No scheduled classes yet</p>
-            <p className="text-sm">Create a class schedule first</p>
+        {error && (
+          <div className="p-3 border border-destructive bg-destructive/10 rounded-md">
+            <p className="text-sm text-destructive">{error}</p>
           </div>
+        )}
+        {loading ? (
+          <SkeletonTable />
+        ) : schedules.length === 0 ? (
+          <EmptyState
+            icon={Calendar}
+            title="No scheduled classes yet"
+            description="Create a class schedule first"
+          />
         ) : (
           <>
             <div className="space-y-2">
               <label className="text-sm font-medium">Select Class Session</label>
               <Select value={selectedScheduleId} onValueChange={setSelectedScheduleId}>
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -234,11 +249,13 @@ export function AttendanceTab({ groupId, students, teacherId }: AttendanceTabPro
               </Select>
             </div>
 
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Student Name</TableHead>
-                  <TableHead>Attendance Status</TableHead>
+            <div className="overflow-x-auto -mx-4 sm:mx-0">
+              <div className="inline-block min-w-full align-middle px-4 sm:px-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="min-w-[150px]">Student Name</TableHead>
+                      <TableHead className="min-w-[150px]">Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -272,7 +289,9 @@ export function AttendanceTab({ groupId, students, teacherId }: AttendanceTabPro
                   ))
                 )}
               </TableBody>
-            </Table>
+                </Table>
+              </div>
+            </div>
           </>
         )}
       </CardContent>

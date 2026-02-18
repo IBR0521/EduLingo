@@ -11,7 +11,7 @@ import { ScheduleTab } from "@/components/dashboard/group-tabs/schedule-tab"
 import { Leaderboard } from "@/components/dashboard/gamification/leaderboard"
 import { LearningPathViewer } from "@/components/dashboard/learning-path/learning-path-viewer"
 import { ModuleManager } from "@/components/dashboard/learning-path/module-manager"
-import { AdvancedAnalytics } from "@/components/dashboard/analytics/advanced-analytics"
+import { AnalyticsDashboard } from "@/components/analytics/analytics-dashboard"
 import { MaterialManager } from "@/components/dashboard/materials/material-manager"
 import { AnnouncementsManager } from "@/components/dashboard/announcements/announcements-manager"
 import { createClient } from "@/lib/supabase/client"
@@ -57,22 +57,24 @@ export function GroupDetail({ group, teacherId, onUpdate, isStudentView = false,
       </div>
 
       <Tabs defaultValue="students" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="students">Students</TabsTrigger>
-          <TabsTrigger value="schedule">Schedule</TabsTrigger>
-          <TabsTrigger value="assignments">Assignments</TabsTrigger>
-          <TabsTrigger value="attendance">Attendance</TabsTrigger>
-          <TabsTrigger value="grades">Grades</TabsTrigger>
-          <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
-          <TabsTrigger value="announcements">Announcements</TabsTrigger>
-          {!isStudentView && <TabsTrigger value="analytics">Analytics</TabsTrigger>}
-          {!isStudentView && <TabsTrigger value="materials">Materials</TabsTrigger>}
-          {isStudentView ? (
-            <TabsTrigger value="learning-path">Learning Path</TabsTrigger>
-          ) : (
-            <TabsTrigger value="modules">Course Modules</TabsTrigger>
-          )}
-        </TabsList>
+        <div className="w-full border-b overflow-x-auto scrollbar-hide -mx-4 sm:mx-0 px-4 sm:px-0">
+          <TabsList className="inline-flex h-10 items-center justify-start rounded-none border-b bg-transparent p-0 w-max min-w-full">
+            <TabsTrigger value="students" className="whitespace-nowrap">Students</TabsTrigger>
+            <TabsTrigger value="schedule" className="whitespace-nowrap">Schedule</TabsTrigger>
+            <TabsTrigger value="assignments" className="whitespace-nowrap">Assignments</TabsTrigger>
+            <TabsTrigger value="attendance" className="whitespace-nowrap">Attendance</TabsTrigger>
+            <TabsTrigger value="grades" className="whitespace-nowrap">Grades</TabsTrigger>
+            <TabsTrigger value="leaderboard" className="whitespace-nowrap">Leaderboard</TabsTrigger>
+            <TabsTrigger value="announcements" className="whitespace-nowrap">Announcements</TabsTrigger>
+            {!isStudentView && <TabsTrigger value="analytics" className="whitespace-nowrap">Analytics</TabsTrigger>}
+            {!isStudentView && <TabsTrigger value="materials" className="whitespace-nowrap">Materials</TabsTrigger>}
+            {isStudentView ? (
+              <TabsTrigger value="learning-path" className="whitespace-nowrap">Learning Path</TabsTrigger>
+            ) : (
+              <TabsTrigger value="modules" className="whitespace-nowrap">Course Modules</TabsTrigger>
+            )}
+          </TabsList>
+        </div>
 
         <TabsContent value="students">
           <StudentsTab groupId={group.id} students={students} onUpdate={loadStudents} isMainTeacher={isMainTeacher} />
@@ -110,7 +112,11 @@ export function GroupDetail({ group, teacherId, onUpdate, isStudentView = false,
         {!isStudentView && (
           <>
             <TabsContent value="analytics">
-              <AdvancedAnalytics groupId={group.id} teacherId={teacherId} />
+              <AnalyticsDashboard 
+                currentUserId={teacherId} 
+                userRole={isMainTeacher ? "main_teacher" : "teacher"} 
+                groupId={group.id}
+              />
             </TabsContent>
             <TabsContent value="materials">
               <MaterialManager groupId={group.id} teacherId={teacherId} />
