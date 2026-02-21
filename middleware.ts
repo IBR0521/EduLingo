@@ -36,12 +36,48 @@ export async function middleware(request: NextRequest) {
       },
     })
     
-    // Refresh session on every request to keep it alive
+    // Check if user is authenticated
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
-        // Refresh the session to extend expiration
-        await supabase.auth.refreshSession()
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      // If user is logged in and on root path, redirect to dashboard
+      if (user && request.nextUrl.pathname === '/') {
+        // Get user profile to determine role
+        const { data: profile } = await supabase
+          .from("users")
+          .select("role")
+          .eq("id", user.id)
+          .single()
+
+        if (profile) {
+          const roleRoutes = {
+            main_teacher: "/dashboard/main-teacher",
+            teacher: "/dashboard/teacher",
+            student: "/dashboard/student",
+            parent: "/dashboard/parent",
+          } as const
+          const roleRoute = roleRoutes[profile.role as keyof typeof roleRoutes] || "/dashboard"
+          return NextResponse.redirect(new URL(roleRoute, request.url))
+        } else {
+          // Profile not found, redirect to dashboard
+          return NextResponse.redirect(new URL("/dashboard", request.url))
+        }
+      }
+      
+      // Refresh session on every request to keep it alive
+      if (user) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession()
+          if (session) {
+            // Refresh the session to extend expiration
+            await supabase.auth.refreshSession()
+          }
+        } catch (error: any) {
+          // Ignore "Auth session missing" errors
+          if (error?.message !== "Auth session missing!" && error?.name !== "AuthSessionMissingError") {
+            // Silently continue
+          }
+        }
       }
     } catch (error: any) {
       // Ignore "Auth session missing" errors - they're expected for unauthenticated requests
@@ -49,10 +85,6 @@ export async function middleware(request: NextRequest) {
         // Silently continue - don't interrupt the request
       }
     }
-
-    // Note: We don't call getSession() here to avoid "Auth session missing" errors
-    // The Supabase client will handle session management automatically
-    // Cookies are synced through the cookie handlers above
   } catch (error: any) {
     // Continue even if there's an error
     // Ignore "Auth session missing" errors as they're expected for unauthenticated requests
