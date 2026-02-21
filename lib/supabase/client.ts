@@ -17,6 +17,9 @@ export function createClient() {
     throw new Error("Missing Supabase configuration. Please check your environment variables.")
   }
 
+  // createBrowserClient automatically syncs with server-side cookies
+  // It reads/writes cookies that are set by the server (middleware and server components)
+  // This ensures sessions persist across browser restarts
   client = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey)
 
   return client
