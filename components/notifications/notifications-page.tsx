@@ -23,6 +23,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Skeleton, SkeletonCard } from "@/components/ui/skeleton-loader"
+import { EmptyState } from "@/components/ui/empty-state"
 
 interface NotificationsPageProps {
   user: User
