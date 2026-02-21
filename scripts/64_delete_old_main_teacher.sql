@@ -67,13 +67,21 @@ BEGIN
       RAISE NOTICE 'push_subscriptions table does not exist, skipping';
     END;
     
-    -- Delete from pending_students
-    DELETE FROM pending_students WHERE email = target_email OR created_by = user_id_to_delete;
-    RAISE NOTICE 'Deleted from pending_students';
+    -- Delete from pending_students (if table exists)
+    BEGIN
+      DELETE FROM pending_students WHERE email = target_email OR created_by = user_id_to_delete;
+      RAISE NOTICE 'Deleted from pending_students';
+    EXCEPTION WHEN undefined_table THEN
+      RAISE NOTICE 'pending_students table does not exist, skipping';
+    END;
     
-    -- Delete from pending_teachers
-    DELETE FROM pending_teachers WHERE email = target_email OR created_by = user_id_to_delete;
-    RAISE NOTICE 'Deleted from pending_teachers';
+    -- Delete from pending_teachers (if table exists)
+    BEGIN
+      DELETE FROM pending_teachers WHERE email = target_email OR created_by = user_id_to_delete;
+      RAISE NOTICE 'Deleted from pending_teachers';
+    EXCEPTION WHEN undefined_table THEN
+      RAISE NOTICE 'pending_teachers table does not exist, skipping';
+    END;
     
     -- Delete from users table
     DELETE FROM users WHERE id = user_id_to_delete;
