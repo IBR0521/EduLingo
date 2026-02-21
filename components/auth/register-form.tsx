@@ -234,15 +234,42 @@ export function RegisterForm() {
       let userCreated = false
 
       // Sign up the user
-      // Include role in metadata so the database trigger can use it
+      // Include all fields in metadata so the database trigger can use them
+      const signupMetadata: any = {
+        full_name: fullName,
+        role: role,
+      }
+      
+      // Add phone number and has_phone based on role
+      if (role === "parent") {
+        signupMetadata.phone_number = formattedPhone || null
+        signupMetadata.has_phone = true
+      } else if (role === "student") {
+        signupMetadata.phone_number = hasPhone ? (formattedPhone || null) : null
+        signupMetadata.has_phone = hasPhone
+        // Add student-specific fields
+        if (age) signupMetadata.age = parseInt(age)
+        if (englishLevel) signupMetadata.english_level = englishLevel
+        if (certificateType) signupMetadata.certificate_type = certificateType
+      } else if (role === "teacher" || role === "main_teacher") {
+        signupMetadata.phone_number = formattedPhone || null
+        signupMetadata.has_phone = !!formattedPhone
+        // Add teacher-specific fields
+        if (age) signupMetadata.age = parseInt(age)
+        if (ieltsScore) signupMetadata.ielts_score = parseFloat(ieltsScore)
+        if (etk) signupMetadata.etk = etk
+        signupMetadata.employment_start_date = new Date().toISOString().split('T')[0]
+        signupMetadata.salary_status = "pending"
+      } else {
+        signupMetadata.phone_number = formattedPhone || null
+        signupMetadata.has_phone = !!formattedPhone
+      }
+      
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: {
-            full_name: fullName,
-            role: role, // Include role in metadata for the database trigger
-          },
+          data: signupMetadata,
         },
       })
 
