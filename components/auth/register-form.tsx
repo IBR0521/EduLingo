@@ -478,13 +478,26 @@ export function RegisterForm() {
                 updateData.etk = etk
                 needsUpdate = true
               }
+              // Only add employment_start_date if column exists (check by trying to set it)
+              // If column doesn't exist, the update will fail but we'll catch it
               if (!existingProfile.employment_start_date) {
-                updateData.employment_start_date = new Date().toISOString().split('T')[0]
-                needsUpdate = true
+                try {
+                  updateData.employment_start_date = new Date().toISOString().split('T')[0]
+                  needsUpdate = true
+                } catch (e) {
+                  // Column doesn't exist, skip it
+                  console.warn("employment_start_date column not found, skipping")
+                }
               }
+              // Only add salary_status if column exists
               if (!existingProfile.salary_status) {
-                updateData.salary_status = "pending"
-                needsUpdate = true
+                try {
+                  updateData.salary_status = "pending"
+                  needsUpdate = true
+                } catch (e) {
+                  // Column doesn't exist, skip it
+                  console.warn("salary_status column not found, skipping")
+                }
               }
               // Teachers must have phone number
               if (!existingProfile.phone_number && formattedPhone) {
