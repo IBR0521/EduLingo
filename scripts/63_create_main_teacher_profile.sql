@@ -18,7 +18,7 @@ ORDER BY au.created_at DESC;
 -- Replace 'your-main-teacher-email@example.com' with your actual email
 DO $$
 DECLARE
-  target_email TEXT := 'your-main-teacher-email@example.com';  -- REPLACE THIS WITH YOUR EMAIL
+  target_email TEXT := 'shaxnoz0113@gmail.com';  -- New main teacher email
   auth_user_id UUID;
   auth_user_email TEXT;
   auth_user_name TEXT;

@@ -6,7 +6,7 @@
 
 DO $$
 DECLARE
-  target_email TEXT := 'old-main-teacher-email@example.com';  -- REPLACE THIS WITH OLD EMAIL
+  target_email TEXT := 'bekzodburxonjonov2@gmail.com';  -- Old main teacher email to delete
   user_id_to_delete UUID;
 BEGIN
   -- Find the user ID from auth.users
