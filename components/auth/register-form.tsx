@@ -233,6 +233,22 @@ export function RegisterForm() {
       // Track if user was created (even if there was an error)
       let userCreated = false
 
+      // Format phone number for Uzbekistan (needed for signup metadata and profile updates)
+      let formattedPhone = phoneNumber.trim().replace(/[\s\-\(\)]/g, "")
+      if (formattedPhone && !formattedPhone.startsWith("+")) {
+        if (formattedPhone.startsWith("9") && formattedPhone.length === 9) {
+          formattedPhone = `+998${formattedPhone}`
+        } else if (formattedPhone.startsWith("998") && formattedPhone.length === 12) {
+          formattedPhone = `+${formattedPhone}`
+        } else if (!formattedPhone.startsWith("+998")) {
+          formattedPhone = `+998${formattedPhone}`
+        }
+      }
+      // If phone number is empty, set to empty string (not null) for easier checks
+      if (!formattedPhone || formattedPhone.trim() === "") {
+        formattedPhone = ""
+      }
+
       // Sign up the user
       // Include all fields in metadata so the database trigger can use them
       const signupMetadata: any = {
