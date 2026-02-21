@@ -398,27 +398,83 @@ export function RegisterForm() {
             profileData = existingProfile
             console.log("Profile found (created by trigger):", existingProfile)
             
-            // If role doesn't match, try to update (we have session)
+            // Update profile with additional fields if they're missing
+            // The trigger might have created a basic profile without phone/age/etc.
+            const updateData: any = {}
+            let needsUpdate = false
+            
+            // If role doesn't match, update it
             if (existingProfile && 'role' in existingProfile && existingProfile.role !== role) {
-              console.log("Role mismatch. Updating from", (existingProfile as any).role, "to", role)
+              updateData.role = role as any
+              needsUpdate = true
+            }
+            
+            // Update phone number if missing
+            if (!existingProfile.phone_number && formattedPhone) {
+              updateData.phone_number = formattedPhone
+              updateData.has_phone = true
+              needsUpdate = true
+            } else if (existingProfile.has_phone === null || existingProfile.has_phone === undefined) {
+              updateData.has_phone = role === "parent" ? true : (hasPhone || false)
+              needsUpdate = true
+            }
+            
+            // Update student-specific fields if missing
+            if (role === "student") {
+              if (!existingProfile.age && age) {
+                updateData.age = parseInt(age)
+                needsUpdate = true
+              }
+              if (!existingProfile.english_level && englishLevel) {
+                updateData.english_level = englishLevel
+                needsUpdate = true
+              }
+              if (!existingProfile.certificate_type && certificateType) {
+                updateData.certificate_type = certificateType
+                needsUpdate = true
+              }
+            }
+            
+            // Update teacher-specific fields if missing
+            if (role === "teacher" || role === "main_teacher") {
+              if (!existingProfile.age && age) {
+                updateData.age = parseInt(age)
+                needsUpdate = true
+              }
+              if (!existingProfile.ielts_score && ieltsScore) {
+                updateData.ielts_score = parseFloat(ieltsScore)
+                needsUpdate = true
+              }
+              if (!existingProfile.etk && etk) {
+                updateData.etk = etk
+                needsUpdate = true
+              }
+              if (!existingProfile.employment_start_date) {
+                updateData.employment_start_date = new Date().toISOString().split('T')[0]
+                needsUpdate = true
+              }
+              if (!existingProfile.salary_status) {
+                updateData.salary_status = "pending"
+                needsUpdate = true
+              }
+            }
+            
+            // Update if needed
+            if (needsUpdate) {
+              console.log("Updating profile with additional fields:", updateData)
               const { data: updatedProfile, error: updateError } = await supabase
                 .from("users")
-                .update({ role: role as any })
+                .update(updateData)
                 .eq("id", actualUserId)
                 .select()
                 .single()
               
               if (updatedProfile && !updateError) {
                 profileData = updatedProfile
-                console.log("Role updated successfully")
+                console.log("Profile updated successfully with additional fields:", updatedProfile)
               } else if (updateError) {
-                const updateErrorInfo = {
-                  message: updateError.message,
-                  code: updateError.code,
-                  status: (updateError as any)?.status,
-                }
-                console.error("Failed to update role:", updateErrorInfo)
-                // Continue with existing profile
+                console.error("Failed to update profile with additional fields:", updateError)
+                // Don't fail registration - profile exists, just missing some fields
               }
             }
           } else if (checkError) {
