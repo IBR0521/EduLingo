@@ -22,10 +22,43 @@ BEGIN
     
     -- Delete from all related tables (in order of dependencies)
     
-    -- Delete from groups where user is teacher or creator
+    -- Update groups where user is teacher or creator
     UPDATE groups SET teacher_id = NULL WHERE teacher_id = user_id_to_delete;
     UPDATE groups SET created_by = NULL WHERE created_by = user_id_to_delete;
     RAISE NOTICE 'Updated groups (removed teacher references)';
+    
+    -- Update courses where user is creator (if table exists)
+    BEGIN
+      UPDATE courses SET created_by = NULL WHERE created_by = user_id_to_delete;
+      RAISE NOTICE 'Updated courses (removed creator references)';
+    EXCEPTION WHEN undefined_table THEN
+      RAISE NOTICE 'courses table does not exist, skipping';
+    END;
+    
+    -- Update other tables that might reference this user as creator
+    -- Update course_modules (if table exists)
+    BEGIN
+      UPDATE course_modules SET created_by = NULL WHERE created_by = user_id_to_delete;
+      RAISE NOTICE 'Updated course_modules (removed creator references)';
+    EXCEPTION WHEN undefined_table THEN
+      RAISE NOTICE 'course_modules table does not exist, skipping';
+    END;
+    
+    -- Update lessons (if table exists)
+    BEGIN
+      UPDATE lessons SET created_by = NULL WHERE created_by = user_id_to_delete;
+      RAISE NOTICE 'Updated lessons (removed creator references)';
+    EXCEPTION WHEN undefined_table THEN
+      RAISE NOTICE 'lessons table does not exist, skipping';
+    END;
+    
+    -- Update assignments (if created_by exists)
+    BEGIN
+      UPDATE assignments SET created_by = NULL WHERE created_by = user_id_to_delete;
+      RAISE NOTICE 'Updated assignments (removed creator references)';
+    EXCEPTION WHEN OTHERS THEN
+      RAISE NOTICE 'Could not update assignments, skipping';
+    END;
     
     -- Delete from parent_student
     DELETE FROM parent_student WHERE parent_id = user_id_to_delete OR student_id = user_id_to_delete;
