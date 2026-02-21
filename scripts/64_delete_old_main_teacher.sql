@@ -27,37 +27,57 @@ BEGIN
     UPDATE groups SET created_by = NULL WHERE created_by = user_id_to_delete;
     RAISE NOTICE 'Updated groups (removed teacher references)';
     
-    -- Update courses where user is creator (if table exists)
+    -- Update courses where user is creator (if table and column exist)
     BEGIN
-      UPDATE courses SET created_by = NULL WHERE created_by = user_id_to_delete;
-      RAISE NOTICE 'Updated courses (removed creator references)';
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'courses' AND column_name = 'created_by'
+      ) THEN
+        UPDATE courses SET created_by = NULL WHERE created_by = user_id_to_delete;
+        RAISE NOTICE 'Updated courses (removed creator references)';
+      END IF;
     EXCEPTION WHEN undefined_table THEN
       RAISE NOTICE 'courses table does not exist, skipping';
     END;
     
     -- Update other tables that might reference this user as creator
-    -- Update course_modules (if table exists)
+    -- Update course_modules (if table and column exist)
     BEGIN
-      UPDATE course_modules SET created_by = NULL WHERE created_by = user_id_to_delete;
-      RAISE NOTICE 'Updated course_modules (removed creator references)';
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'course_modules' AND column_name = 'created_by'
+      ) THEN
+        UPDATE course_modules SET created_by = NULL WHERE created_by = user_id_to_delete;
+        RAISE NOTICE 'Updated course_modules (removed creator references)';
+      END IF;
     EXCEPTION WHEN undefined_table THEN
       RAISE NOTICE 'course_modules table does not exist, skipping';
     END;
     
-    -- Update lessons (if table exists)
+    -- Update lessons (if table and column exist)
     BEGIN
-      UPDATE lessons SET created_by = NULL WHERE created_by = user_id_to_delete;
-      RAISE NOTICE 'Updated lessons (removed creator references)';
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'lessons' AND column_name = 'created_by'
+      ) THEN
+        UPDATE lessons SET created_by = NULL WHERE created_by = user_id_to_delete;
+        RAISE NOTICE 'Updated lessons (removed creator references)';
+      END IF;
     EXCEPTION WHEN undefined_table THEN
       RAISE NOTICE 'lessons table does not exist, skipping';
     END;
     
-    -- Update assignments (if created_by exists)
+    -- Update assignments (if created_by column exists)
     BEGIN
-      UPDATE assignments SET created_by = NULL WHERE created_by = user_id_to_delete;
-      RAISE NOTICE 'Updated assignments (removed creator references)';
-    EXCEPTION WHEN OTHERS THEN
-      RAISE NOTICE 'Could not update assignments, skipping';
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'assignments' AND column_name = 'created_by'
+      ) THEN
+        UPDATE assignments SET created_by = NULL WHERE created_by = user_id_to_delete;
+        RAISE NOTICE 'Updated assignments (removed creator references)';
+      END IF;
+    EXCEPTION WHEN undefined_table THEN
+      RAISE NOTICE 'assignments table does not exist, skipping';
     END;
     
     -- Delete from parent_student
