@@ -40,6 +40,19 @@ BEGIN
       RAISE NOTICE 'courses table does not exist, skipping';
     END;
     
+    -- Update course_templates where user is creator (if table and column exist)
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'course_templates' AND column_name = 'created_by'
+      ) THEN
+        UPDATE course_templates SET created_by = NULL WHERE created_by = user_id_to_delete;
+        RAISE NOTICE 'Updated course_templates (removed creator references)';
+      END IF;
+    EXCEPTION WHEN undefined_table THEN
+      RAISE NOTICE 'course_templates table does not exist, skipping';
+    END;
+    
     -- Update other tables that might reference this user as creator
     -- Update course_modules (if table and column exist)
     BEGIN
