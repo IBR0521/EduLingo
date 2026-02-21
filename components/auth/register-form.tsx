@@ -544,17 +544,8 @@ export function RegisterForm() {
           }
         }
 
-        // Format phone number for Uzbekistan (needed for both update and insert)
-        let formattedPhone = phoneNumber.trim().replace(/[\s\-\(\)]/g, "")
-        if (formattedPhone && !formattedPhone.startsWith("+")) {
-          if (formattedPhone.startsWith("9") && formattedPhone.length === 9) {
-            formattedPhone = `+998${formattedPhone}`
-          } else if (formattedPhone.startsWith("998") && formattedPhone.length === 12) {
-            formattedPhone = `+${formattedPhone}`
-          } else if (!formattedPhone.startsWith("+998")) {
-            formattedPhone = `+998${formattedPhone}`
-          }
-        }
+        // formattedPhone is already defined earlier in the function (line 237)
+        // No need to redefine it here
 
         // Check if this is a pending student completing registration
         if (existingPendingStudent && role === "student" && hasSession) {
