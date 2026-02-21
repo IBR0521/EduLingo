@@ -435,6 +435,19 @@ export function RegisterForm() {
               }
             }
             
+            // Update parent-specific fields if missing
+            if (role === "parent") {
+              // Parents must have phone number
+              if (!existingProfile.phone_number && formattedPhone) {
+                updateData.phone_number = formattedPhone
+                updateData.has_phone = true
+                needsUpdate = true
+              } else if (existingProfile.has_phone === null || existingProfile.has_phone === undefined) {
+                updateData.has_phone = true
+                needsUpdate = true
+              }
+            }
+            
             // Update teacher-specific fields if missing
             if (role === "teacher" || role === "main_teacher") {
               if (!existingProfile.age && age) {
@@ -455,6 +468,15 @@ export function RegisterForm() {
               }
               if (!existingProfile.salary_status) {
                 updateData.salary_status = "pending"
+                needsUpdate = true
+              }
+              // Teachers must have phone number
+              if (!existingProfile.phone_number && formattedPhone) {
+                updateData.phone_number = formattedPhone
+                updateData.has_phone = true
+                needsUpdate = true
+              } else if (existingProfile.has_phone === null || existingProfile.has_phone === undefined) {
+                updateData.has_phone = !!formattedPhone
                 needsUpdate = true
               }
             }
