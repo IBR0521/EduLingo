@@ -1,8 +1,45 @@
 import Link from "next/link"
+import { redirect } from "next/navigation"
+import { createClient } from "@/lib/supabase/server"
 import { Button } from "@/components/ui/button"
 import { BookOpen, Users, GraduationCap, MessageSquare, Sparkles, TrendingUp, Shield, Clock } from "lucide-react"
 
-export default function HomePage() {
+export default async function HomePage() {
+  // Check if user is already logged in
+  const supabase = await createClient()
+  
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (user) {
+      // User is logged in, get their profile to redirect to correct dashboard
+      const { data: profile } = await supabase
+        .from("users")
+        .select("role")
+        .eq("id", user.id)
+        .single()
+
+      if (profile) {
+        const roleRoutes = {
+          main_teacher: "/dashboard/main-teacher",
+          teacher: "/dashboard/teacher",
+          student: "/dashboard/student",
+          parent: "/dashboard/parent",
+        } as const
+        const roleRoute = roleRoutes[profile.role as keyof typeof roleRoutes]
+        redirect(roleRoute || "/dashboard")
+      } else {
+        // Profile not found, redirect to dashboard (which will handle it)
+        redirect("/dashboard")
+      }
+    }
+  } catch (error) {
+    // If there's an error checking auth, just show the landing page
+    // This allows unauthenticated users to see the landing page
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/50">
       {/* Navigation Header */}
