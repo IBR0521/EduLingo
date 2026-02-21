@@ -22,6 +22,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { Skeleton, SkeletonCard } from "@/components/ui/skeleton-loader"
 
 interface NotificationsPageProps {
   user: User
@@ -93,11 +94,8 @@ export function NotificationsPage({ user }: NotificationsPageProps) {
     } catch (err: any) {
       const errorInfo = handleDatabaseError(err, "Failed to load notifications")
       setError(errorInfo.message)
-      toast.error(errorInfo.message)
-        name: err?.name,
-      })
       toast.error("Failed to load notifications", {
-        description: err?.message || "Network error. Please check your connection and refresh the page.",
+        description: errorInfo.message || err?.message || "Network error. Please check your connection and refresh the page.",
       })
       setNotifications([]) // Set empty array on error
     } finally {

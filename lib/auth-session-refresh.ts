@@ -16,24 +16,36 @@ export function useSessionRefresh() {
 
     const supabase = createClient()
 
-    // Refresh session every 30 minutes to keep it alive
+    // Refresh session every 15 minutes to keep it alive (more frequent for better persistence)
     const refreshInterval = setInterval(async () => {
       // Check if component is still mounted before making async calls
       if (!isMountedRef.current || typeof document === 'undefined') return
       
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        
+        // Ignore "Auth session missing" errors - they're expected for unauthenticated users
+        if (sessionError && sessionError.message !== "Auth session missing!" && sessionError.name !== "AuthSessionMissingError") {
+          if (process.env.NODE_ENV === "development") {
+            console.error("Session refresh error:", sessionError)
+          }
+          return
+        }
+        
         if (session && isMountedRef.current) {
           // Refresh the session to extend expiration
           await supabase.auth.refreshSession()
         }
-      } catch (error) {
+      } catch (error: any) {
         // Silently fail - don't interrupt user experience
-        if (process.env.NODE_ENV === "development") {
-          console.error("Session refresh error:", error)
+        // Ignore "Auth session missing" errors
+        if (error?.message !== "Auth session missing!" && error?.name !== "AuthSessionMissingError") {
+          if (process.env.NODE_ENV === "development") {
+            console.error("Session refresh error:", error)
+          }
         }
       }
-    }, 30 * 60 * 1000) // Every 30 minutes
+    }, 15 * 60 * 1000) // Every 15 minutes
 
     // Also refresh on page visibility change (when user comes back to tab)
     const handleVisibilityChange = async () => {
@@ -42,12 +54,24 @@ export function useSessionRefresh() {
       
       if (document.visibilityState === "visible") {
         try {
-          const { data: { session } } = await supabase.auth.getSession()
+          const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+          
+          // Ignore "Auth session missing" errors - they're expected for unauthenticated users
+          if (sessionError && sessionError.message !== "Auth session missing!" && sessionError.name !== "AuthSessionMissingError") {
+            return
+          }
+          
           if (session && isMountedRef.current) {
             await supabase.auth.refreshSession()
           }
-        } catch (error) {
-          // Silently fail
+        } catch (error: any) {
+          // Silently fail - ignore "Auth session missing" errors
+          if (error?.message !== "Auth session missing!" && error?.name !== "AuthSessionMissingError") {
+            // Only log non-auth-missing errors in development
+            if (process.env.NODE_ENV === "development") {
+              console.error("Visibility change session refresh error:", error)
+            }
+          }
         }
       }
     }

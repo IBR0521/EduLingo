@@ -20,6 +20,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { useNotifications } from "@/hooks/use-notifications"
+import { useSessionRefresh } from "@/lib/auth-session-refresh"
 
 interface DashboardLayoutProps {
   user: User
@@ -30,6 +31,9 @@ export function DashboardLayout({ user, children }: DashboardLayoutProps) {
   const router = useRouter()
   const pathname = usePathname()
   const { unreadCount } = useNotifications(user.id)
+  
+  // Keep session alive - users won't be logged out automatically
+  useSessionRefresh()
 
   // Determine if we should show the back to dashboard button
   const isDashboardPage = pathname === "/dashboard" || 

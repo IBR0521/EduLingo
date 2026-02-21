@@ -24,10 +24,14 @@ export function ConfirmEmailContent() {
       if (type === "email") {
         const { data, error } = await supabase.auth.getSession()
 
-        if (error) {
+        // Ignore "Auth session missing" errors - they're expected for unauthenticated users
+        if (error && error.message !== "Auth session missing!" && error.name !== "AuthSessionMissingError") {
           setStatus("error")
           setMessage("Failed to confirm email. The link may be invalid or expired.")
-        } else if (data.session) {
+          return
+        }
+        
+        if (data?.session) {
           setStatus("success")
           setMessage("Your email has been confirmed successfully! You can now sign in.")
           setTimeout(() => {

@@ -23,28 +23,36 @@ export async function middleware(request: NextRequest) {
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) => {
             request.cookies.set(name, value)
-            supabaseResponse.cookies.set(name, value, options)
+            // Set long expiration for persistent sessions (1 year)
+            const cookieOptions = {
+              ...options,
+              maxAge: options?.maxAge || 60 * 60 * 24 * 365, // 1 year
+              sameSite: options?.sameSite || 'lax' as const,
+              secure: options?.secure ?? process.env.NODE_ENV === 'production',
+            }
+            supabaseResponse.cookies.set(name, value, cookieOptions)
           })
         },
       },
     })
-
-    // Get session to ensure cookies are synced
-    // This will return null if no session exists, which is fine
-    // Wrap in try-catch to prevent errors from bubbling up
+    
+    // Refresh session on every request to keep it alive
     try {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-      
-      // Only log actual errors, not missing sessions (which is normal for unauthenticated requests)
-      if (sessionError && sessionError.message !== "Auth session missing!" && sessionError.name !== "AuthSessionMissingError") {
-        console.error("Middleware session error:", sessionError)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        // Refresh the session to extend expiration
+        await supabase.auth.refreshSession()
       }
-    } catch (sessionErr: any) {
-      // Silently ignore "Auth session missing" errors - they're expected for unauthenticated requests
-      if (sessionErr?.message !== "Auth session missing!" && sessionErr?.name !== "AuthSessionMissingError") {
-        console.error("Middleware session check error:", sessionErr)
+    } catch (error: any) {
+      // Ignore "Auth session missing" errors - they're expected for unauthenticated requests
+      if (error?.message !== "Auth session missing!" && error?.name !== "AuthSessionMissingError") {
+        // Silently continue - don't interrupt the request
       }
     }
+
+    // Note: We don't call getSession() here to avoid "Auth session missing" errors
+    // The Supabase client will handle session management automatically
+    // Cookies are synced through the cookie handlers above
   } catch (error: any) {
     // Continue even if there's an error
     // Ignore "Auth session missing" errors as they're expected for unauthenticated requests

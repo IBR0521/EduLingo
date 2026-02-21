@@ -67,8 +67,25 @@ export function ParentDashboard({ user }: ParentDashboardProps) {
   useEffect(() => {
     if (selectedStudent) {
       loadStudentDetails(selectedStudent.id)
+      // Also refresh stats when student is selected
+      loadStudentStats(selectedStudent.id).then((stats) => {
+        // Only update if stats actually changed to prevent infinite loop
+        setSelectedStudent((prev) => {
+          if (!prev) return null
+          // Check if stats are different
+          const statsChanged = 
+            prev.stats?.averageGrade !== stats.averageGrade ||
+            prev.stats?.attendanceRate !== stats.attendanceRate ||
+            prev.stats?.totalAssignments !== stats.totalAssignments
+          
+          if (statsChanged) {
+            return { ...prev, stats }
+          }
+          return prev // Return same reference if no change
+        })
+      })
     }
-  }, [selectedStudent])
+  }, [selectedStudent?.id]) // Only depend on the ID, not the whole object
 
   const loadLinkedStudents = async () => {
     setLoading(true)
@@ -125,67 +142,89 @@ export function ParentDashboard({ user }: ParentDashboardProps) {
   }
 
   const loadStudentStats = async (studentId: string) => {
-    const supabase = createClient()
+    try {
+      const supabase = createClient()
 
-    // Load grades with error handling
-    const { data: gradesData, error: gradesError } = await supabase
-      .from("grades")
-      .select("score")
-      .eq("student_id", studentId)
+      // Load grades with error handling
+      const { data: gradesData, error: gradesError } = await supabase
+        .from("grades")
+        .select("score")
+        .eq("student_id", studentId)
 
-    if (gradesError) {
-      console.error("Error loading grades:", gradesError)
-    }
-
-    const averageGrade =
-      gradesData && gradesData.length > 0
-        ? gradesData.reduce((sum, grade) => sum + grade.score, 0) / gradesData.length
-        : 0
-
-    // Load attendance - count present, late, and excused as attended
-    const { data: attendanceData, error: attendanceError } = await supabase
-      .from("attendance")
-      .select("status")
-      .eq("student_id", studentId)
-
-    if (attendanceError) {
-      console.error("Error loading attendance:", attendanceError)
-    }
-
-    const attendanceRate =
-      attendanceData && attendanceData.length > 0
-        ? (attendanceData.filter((a) => a.status === "present" || a.status === "late" || a.status === "excused").length / attendanceData.length) * 100
-        : 0
-
-    // Load assignments - get groups student is enrolled in, then count assignments
-    const { data: groupEnrollments, error: enrollmentsError } = await supabase
-      .from("group_students")
-      .select("group_id")
-      .eq("student_id", studentId)
-
-    if (enrollmentsError) {
-      console.error("Error loading group enrollments:", enrollmentsError)
-    }
-
-    let totalAssignments = 0
-    if (groupEnrollments && groupEnrollments.length > 0) {
-      const groupIds = groupEnrollments.map((ge) => ge.group_id)
-      const { data: assignmentsData, error: assignmentsError } = await supabase
-        .from("assignments")
-        .select("id")
-        .in("group_id", groupIds)
-      
-      if (assignmentsError) {
-        console.error("Error loading assignments:", assignmentsError)
-      } else {
-        totalAssignments = assignmentsData?.length || 0
+      if (gradesError) {
+        console.error("Error loading grades:", gradesError)
+        // Check if it's an RLS error
+        if (gradesError.message?.includes("permission denied") || gradesError.message?.includes("row-level security")) {
+          console.error("RLS policy is blocking parent from reading grades. Please run 'scripts/59_parent_access_to_student_data_rls.sql' in Supabase SQL Editor.")
+          toast.showError("Permission denied: Cannot read student grades. Please check RLS policies.")
+        }
       }
-    }
 
-    return {
-      averageGrade,
-      attendanceRate,
-      totalAssignments,
+      const averageGrade =
+        gradesData && gradesData.length > 0
+          ? gradesData.reduce((sum, grade) => sum + grade.score, 0) / gradesData.length
+          : 0
+
+      // Load attendance - count present, late, and excused as attended
+      const { data: attendanceData, error: attendanceError } = await supabase
+        .from("attendance")
+        .select("status")
+        .eq("student_id", studentId)
+
+      if (attendanceError) {
+        console.error("Error loading attendance:", attendanceError)
+        // Check if it's an RLS error
+        if (attendanceError.message?.includes("permission denied") || attendanceError.message?.includes("row-level security")) {
+          console.error("RLS policy is blocking parent from reading attendance. Please run 'scripts/59_parent_access_to_student_data_rls.sql' in Supabase SQL Editor.")
+        }
+      }
+
+      const attendanceRate =
+        attendanceData && attendanceData.length > 0
+          ? (attendanceData.filter((a) => a.status === "present" || a.status === "late" || a.status === "excused").length / attendanceData.length) * 100
+          : 0
+
+      // Load assignments - get groups student is enrolled in, then count assignments
+      const { data: groupEnrollments, error: enrollmentsError } = await supabase
+        .from("group_students")
+        .select("group_id")
+        .eq("student_id", studentId)
+
+      if (enrollmentsError) {
+        console.error("Error loading group enrollments:", enrollmentsError)
+      }
+
+      let totalAssignments = 0
+      if (groupEnrollments && groupEnrollments.length > 0) {
+        const groupIds = groupEnrollments.map((ge) => ge.group_id)
+        const { data: assignmentsData, error: assignmentsError } = await supabase
+          .from("assignments")
+          .select("id")
+          .in("group_id", groupIds)
+        
+        if (assignmentsError) {
+          console.error("Error loading assignments:", assignmentsError)
+          // Check if it's an RLS error
+          if (assignmentsError.message?.includes("permission denied") || assignmentsError.message?.includes("row-level security")) {
+            console.error("RLS policy is blocking parent from reading assignments. Please run 'scripts/59_parent_access_to_student_data_rls.sql' in Supabase SQL Editor.")
+          }
+        } else {
+          totalAssignments = assignmentsData?.length || 0
+        }
+      }
+
+      return {
+        averageGrade,
+        attendanceRate,
+        totalAssignments,
+      }
+    } catch (error) {
+      console.error("Error in loadStudentStats:", error)
+      return {
+        averageGrade: 0,
+        attendanceRate: 0,
+        totalAssignments: 0,
+      }
     }
   }
 
@@ -212,78 +251,99 @@ export function ParentDashboard({ user }: ParentDashboardProps) {
   const loadStudentDetails = async (studentId: string) => {
     setDetailsLoading(true)
     try {
-    const supabase = createClient()
+      const supabase = createClient()
 
-    // Load groups for this student
-    const { data: groupData } = await supabase
-      .from("group_students")
-      .select(
-        `
-        group:group_id(*)
-      `,
-      )
-      .eq("student_id", studentId)
+      // Load groups for this student
+      const { data: groupData, error: groupError } = await supabase
+        .from("group_students")
+        .select(
+          `
+          group:group_id(*)
+        `,
+        )
+        .eq("student_id", studentId)
 
-    const groupIds = groupData?.map((item: { group: Group }) => item.group.id) || []
+      if (groupError) {
+        console.error("Error loading groups:", groupError)
+        toast.showError("Failed to load student groups")
+      }
 
-    if (groupIds.length > 0) {
-      // Load upcoming classes
+      const groupIds = groupData?.map((item: { group: Group }) => item.group.id) || []
+
+      // Load all data in parallel for better performance
       const now = new Date().toISOString()
-      const { data: scheduleData } = await supabase
-        .from("schedule")
-        .select(
-          `
-          *,
-          group:group_id(*)
-        `,
-        )
-        .in("group_id", groupIds)
-        .gte("date", now)
-        .order("date", { ascending: true })
-        .limit(5)
+      const [scheduleResponse, assignmentsResponse, gradesResponse, attendanceResponse] = await Promise.all([
+        groupIds.length > 0
+          ? supabase
+              .from("schedule")
+              .select(
+                `
+                *,
+                group:group_id(*)
+              `,
+              )
+              .in("group_id", groupIds)
+              .gte("date", now)
+              .order("date", { ascending: true })
+              .limit(5)
+          : Promise.resolve({ data: null, error: null }),
+        groupIds.length > 0
+          ? supabase
+              .from("assignments")
+              .select(
+                `
+                *,
+                group:group_id(*)
+              `,
+              )
+              .in("group_id", groupIds)
+              .order("due_date", { ascending: true })
+          : Promise.resolve({ data: null, error: null }),
+        supabase
+          .from("grades")
+          .select("*")
+          .eq("student_id", studentId)
+          .order("created_at", { ascending: false })
+          .limit(5),
+        supabase
+          .from("attendance")
+          .select("*")
+          .eq("student_id", studentId)
+          .order("created_at", { ascending: false }),
+      ])
 
-      if (scheduleData) {
-        setUpcomingClasses(scheduleData)
+      // Handle schedule data
+      if (scheduleResponse.error) {
+        console.error("Error loading upcoming classes:", scheduleResponse.error)
+      } else {
+        setUpcomingClasses(scheduleResponse.data || [])
       }
 
-      // Load assignments
-      const { data: assignmentsData } = await supabase
-        .from("assignments")
-        .select(
-          `
-          *,
-          group:group_id(*)
-        `,
-        )
-        .in("group_id", groupIds)
-        .order("due_date", { ascending: true })
-
-      if (assignmentsData) {
-        setAssignments(assignmentsData)
+      // Handle assignments data
+      if (assignmentsResponse.error) {
+        console.error("Error loading assignments:", assignmentsResponse.error)
+      } else {
+        setAssignments(assignmentsResponse.data || [])
       }
-    }
 
-    // Load grades
-    const { data: gradesData } = await supabase
-      .from("grades")
-      .select("*")
-      .eq("student_id", studentId)
-      .order("created_at", { ascending: false })
-      .limit(5)
+      // Handle grades data
+      if (gradesResponse.error) {
+        console.error("Error loading grades:", gradesResponse.error)
+      } else {
+        setGrades(gradesResponse.data || [])
+      }
 
-    if (gradesData) {
-      setGrades(gradesData)
-    }
-
-    // Load attendance
-    const { data: attendanceData } = await supabase
-      .from("attendance")
-      .select("*")
-      .eq("student_id", studentId)
-      .order("created_at", { ascending: false })
-
-    if (attendanceData) {
-      setAttendance(attendanceData)
+      // Handle attendance data
+      if (attendanceResponse.error) {
+        console.error("Error loading attendance:", attendanceResponse.error)
+      } else {
+        setAttendance(attendanceResponse.data || [])
+      }
+    } catch (error) {
+      console.error("Error loading student details:", error)
+      toast.showError("Failed to load student details")
+    } finally {
+      setDetailsLoading(false)
     }
   }
 
@@ -596,14 +656,13 @@ export function ParentDashboard({ user }: ParentDashboardProps) {
 
             {selectedStudent && (
               <>
-                {detailsLoading && (
+                {detailsLoading ? (
                   <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                     {[...Array(3)].map((_, i) => (
                       <SkeletonCard key={i} />
                     ))}
                   </div>
-                )}
-                {!detailsLoading && (
+                ) : (
                   <>
                 <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                   <Card>
@@ -838,7 +897,7 @@ export function ParentDashboard({ user }: ParentDashboardProps) {
                     )}
                   </CardContent>
                 </Card>
-                </>
+                  </>
                 )}
               </>
             )}

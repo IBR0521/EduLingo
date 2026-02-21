@@ -109,3 +109,5 @@ CREATE POLICY "Teachers can delete announcements"
     auth.uid() IN (SELECT id FROM users WHERE role = 'main_teacher')
   );
 
+
+

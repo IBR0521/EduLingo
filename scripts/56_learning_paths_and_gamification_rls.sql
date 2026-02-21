@@ -528,3 +528,5 @@ CREATE POLICY "Teachers can read progress for their groups"
     auth.uid() IN (SELECT id FROM users WHERE role = 'main_teacher')
   );
 
+
+

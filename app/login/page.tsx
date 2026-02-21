@@ -18,7 +18,8 @@ export default function LoginPage() {
           error: userError,
         } = await supabase.auth.getUser()
 
-        if (userError) {
+        // Ignore "Auth session missing" errors - they're expected for unauthenticated users
+        if (userError && userError.message !== "Auth session missing!" && userError.name !== "AuthSessionMissingError") {
           console.error("Auth check error:", userError)
           setChecking(false)
           return

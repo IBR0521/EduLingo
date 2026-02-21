@@ -205,3 +205,5 @@ SELECT * FROM generate_class_completion_report('schedule-id-from-above');
 - Completion reports are sent only once per class
 - The system processes classes that ended in the last 24 hours
 
+
+

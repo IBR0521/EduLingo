@@ -12,6 +12,15 @@ export default function Error({
   error: Error & { digest?: string }
   reset: () => void
 }) {
+  // Suppress "Auth session missing" errors - they're expected for unauthenticated requests
+  if (
+    error?.message === "Auth session missing!" ||
+    error?.name === "AuthSessionMissingError" ||
+    error?.message?.includes("Auth session missing")
+  ) {
+    // Silently handle this error - it's expected for unauthenticated users
+    return null
+  }
   useEffect(() => {
     // Log the error to an error reporting service
     console.error("Application error:", error)

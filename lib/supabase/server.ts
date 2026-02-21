@@ -13,7 +13,16 @@ export async function createClient() {
       },
       setAll(cookiesToSet) {
         try {
-          cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
+          cookiesToSet.forEach(({ name, value, options }) => {
+            // Set long expiration for persistent sessions (1 year)
+            const cookieOptions = {
+              ...options,
+              maxAge: options?.maxAge || 60 * 60 * 24 * 365, // 1 year
+              sameSite: options?.sameSite || 'lax' as const,
+              secure: options?.secure ?? process.env.NODE_ENV === 'production',
+            }
+            cookieStore.set(name, value, cookieOptions)
+          })
         } catch {
           // Ignore errors in Server Components
         }
