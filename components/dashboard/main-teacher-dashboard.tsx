@@ -41,6 +41,7 @@ export function MainTeacherDashboard({ user }: MainTeacherDashboardProps) {
   const [loading, setLoading] = useState(true)
   const [showMobileMenu, setShowMobileMenu] = useState(false)
   const [tabsOverflow, setTabsOverflow] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const tabsRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -49,6 +50,13 @@ export function MainTeacherDashboard({ user }: MainTeacherDashboardProps) {
   }, [])
 
   useEffect(() => {
+    // Set mounted flag to prevent hydration mismatch
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!mounted) return
+
     const checkTabsOverflow = () => {
       if (tabsRef.current) {
         // Check if tabs container has overflow
@@ -70,7 +78,7 @@ export function MainTeacherDashboard({ user }: MainTeacherDashboardProps) {
       clearTimeout(timeoutId)
       window.removeEventListener("resize", checkTabsOverflow)
     }
-  }, [activeTab]) // Re-check when tab changes
+  }, [activeTab, mounted]) // Re-check when tab changes or component mounts
 
   const loadStats = async () => {
     setLoading(true)
@@ -87,7 +95,7 @@ export function MainTeacherDashboard({ user }: MainTeacherDashboardProps) {
         linkedParentsResponse,
       ] = await Promise.all([
         supabase.from("groups").select("id, teacher_id"),
-        supabase.from("users").select("id").eq("role", "teacher"),
+        supabase.from("users").select("id").in("role", ["teacher", "main_teacher"]),
         supabase.from("users").select("id").eq("role", "student"),
         supabase.from("users").select("id").eq("role", "parent"),
         supabase.from("group_students").select("group_id"),
@@ -148,7 +156,7 @@ export function MainTeacherDashboard({ user }: MainTeacherDashboardProps) {
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight">Main Teacher Dashboard</h1>
             <p className="text-sm sm:text-base text-muted-foreground mt-1">Manage all groups, teachers, and students</p>
           </div>
-          {showMobileMenu && (
+          {mounted && showMobileMenu && (
             <div className="flex-shrink-0">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -178,7 +186,7 @@ export function MainTeacherDashboard({ user }: MainTeacherDashboardProps) {
         </div>
 
         {/* Navigation Tabs - Hidden on mobile when menu is shown */}
-        {!showMobileMenu && (
+        {(!mounted || !showMobileMenu) && (
           <div className="w-full border-b overflow-x-auto scrollbar-hide" ref={tabsRef}>
             <div className="flex gap-2 min-w-max pb-1">
               {tabOptions.map((tab) => {

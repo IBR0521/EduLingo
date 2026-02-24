@@ -65,7 +65,7 @@ export function TeachersManagement({ onStatsChange, isMainTeacher = true }: Teac
     setError("")
     try {
       const supabase = createClient()
-      const { data: teachersData, error: teachersError } = await supabase.from("users").select("*").eq("role", "teacher").order("full_name")
+      const { data: teachersData, error: teachersError } = await supabase.from("users").select("*").in("role", ["teacher", "main_teacher"]).order("full_name")
 
       if (teachersError) {
         const errorInfo = handleDatabaseError(teachersError, "Failed to load teachers")
@@ -448,7 +448,14 @@ export function TeachersManagement({ onStatsChange, isMainTeacher = true }: Teac
                         <div className="flex items-center gap-2">
                           <UserCog className="h-4 w-4 text-muted-foreground" />
                           <div>
-                            <div>{teacher.full_name}</div>
+                            <div className="flex items-center gap-2">
+                              <span>{teacher.full_name}</span>
+                              {teacher.role === "main_teacher" && (
+                                <Badge variant="default" className="text-xs">
+                                  Main Teacher
+                                </Badge>
+                              )}
+                            </div>
                             <div className="text-xs text-muted-foreground sm:hidden">{teacher.email}</div>
                           </div>
                         </div>

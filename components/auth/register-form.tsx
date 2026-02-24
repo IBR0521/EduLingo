@@ -1117,7 +1117,7 @@ export function RegisterForm() {
                   placeholder="Enter your age"
                   value={age}
                   onChange={(e) => setAge(e.target.value)}
-                  min="18"
+                  min="15"
                   max="100"
                   required
                   disabled={loading}

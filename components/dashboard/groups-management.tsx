@@ -102,7 +102,7 @@ export function GroupsManagement({ isMainTeacher, currentUserId, onStatsChange }
   const loadTeachers = async () => {
     try {
       const supabase = createClient()
-      const { data, error } = await supabase.from("users").select("*").eq("role", "teacher").order("full_name")
+      const { data, error } = await supabase.from("users").select("*").in("role", ["teacher", "main_teacher"]).order("full_name")
 
       if (error) {
         console.error("Error loading teachers:", error)
@@ -296,7 +296,7 @@ export function GroupsManagement({ isMainTeacher, currentUserId, onStatsChange }
                       <SelectItem value="default">No teacher assigned</SelectItem> {/* Updated value prop */}
                       {teachers.map((teacher) => (
                         <SelectItem key={teacher.id} value={teacher.id}>
-                          {teacher.full_name}
+                          {teacher.full_name}{teacher.role === "main_teacher" ? " (Main Teacher)" : ""}
                         </SelectItem>
                       ))}
                     </SelectContent>
